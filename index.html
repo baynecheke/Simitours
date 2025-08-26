@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Simitaur Adventure — Full</title>
+<style>
+  :root{
+    --bg:#0e1610; --panel:rgba(6,8,6,.9);
+    --card:#16261a; --accent:#ffd166; --btn:#2f6e3a; --btn-h:#3f8e4d;
+    --danger:#ff5b5b;
+  }
+  html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial;background:var(--bg);color:#fff}
+  .wrap{max-width:1100px;margin:12px auto;padding:8px}
+  /* 8 x 10 viewport (W x H) */
+  canvas#game{display:block;margin:10px auto;border:3px solid #274f34;background:#87d594;image-rendering:pixelated;touch-action:none;width:512px;height:640px}
+  /* HUD */
+  #hud{position:fixed;top:12px;right:12px;display:flex;gap:8px;z-index:60}
+  .pill{background:var(--btn);border:none;color:#fff;border-radius:999px;padding:8px 12px;font-weight:700;cursor:pointer;box-shadow:0 3px 0 #204c28}
+  .pill:active{transform:translateY(1px)}
+  /* DPad */
+  #dpad{position:fixed;left:12px;bottom:12px;display:grid;grid-template-columns:48px 48px;grid-template-rows:48px 48px 48px;gap:6px;z-index:60}
+  #dpad button{width:48px;height:48px;border-radius:10px;border:none;background:#254b2d;color:white;font-weight:700;box-shadow:0 3px 0 #173221}
+  /* Panels */
+  .panel{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:var(--panel);backdrop-filter:blur(3px);z-index:80}
+  .panel.show{display:flex}
+  .box{background:var(--card);border:1px solid #2f5b3f;border-radius:12px;padding:16px 20px;box-shadow:0 12px 36px rgba(0,0,0,.6);max-width:94vw}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  button.btn{background:var(--btn);border:none;border-radius:8px;padding:8px 12px;color:#fff;font-weight:700;cursor:pointer}
+  button.btn:hover{background:var(--btn-h)}
+  .danger{background:var(--danger)}
+  .hp{width:220px;height:14px;background:#111;border-radius:6px;overflow:hidden;border:1px solid #000}
+  .fill{height:100%;background:#ff6b6b;width:100%;transition:width .18s linear}
+  /* dex */
+  #dexGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;max-height:60vh;overflow:auto}
+  .dexCard{display:flex;gap:8px;align-items:center;background:#203425;border:1px solid #2f5b3f;border-radius:10px;padding:8px;cursor:pointer;position:relative;padding-right:12px}
+  .dexCard img{width:56px;height:56px;object-fit:cover;border-radius:6px}
+  .rarity-Common{border:2px solid rgba(38,145,255,0.3);box-shadow:0 0 8px rgba(38,145,255,.12)}
+  .rarity-Uncommon{border:2px solid #999;box-shadow:0 0 8px rgba(160,160,160,.15)}
+  .rarity-Rare{border:2px solid #7e57c2;box-shadow:0 0 10px rgba(126,87,194,.15)}
+  .rarity-Legendary{border:2px solid gold;animation:legendGlow 1.6s infinite}
+  @keyframes legendGlow{0%{box-shadow:0 0 6px gold}50%{box-shadow:0 0 18px gold}100%{box-shadow:0 0 6px gold}}
+  .rarity-Mythic{border:2px solid #6a5acd;animation:mythGlow 1.8s infinite}
+  @keyframes mythGlow{0%{box-shadow:0 0 6px #6a5acd}50%{box-shadow:0 0 14px #4aa3ff}100%{box-shadow:0 0 6px #6a5acd}}
+  .rarity-Exotic{border:3px solid transparent;animation:exoticRainbow 2s linear infinite}
+  @keyframes exoticRainbow{0%{border-color:#ff0000}14%{border-color:#ff7f00}28%{border-color:#ffff00}42%{border-color:#00ff00}56%{border-color:#0000ff}70%{border-color:#4b0082}84%{border-color:#8f00ff}100%{border-color:#ff0000}}
+  /* small */
+  @media (max-width:800px){ canvas#game{width:92vw;height:115vw} #dpad{left:50%;transform:translateX(-50%)} #hud{right:8px;left:8px;justify-content:center} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <!-- 8x10 viewport canvas (512x640 @ TILE 64) -->
+  <canvas id="game" width="512" height="640"></canvas>
+</div>
+
+<!-- HUD -->
+<div id="hud" style="display:none">
+  <button id="btnSettings" class="pill">Settings</button>
+  <button id="btnDex" class="pill">SimDex</button>
+  <button id="btnMusic" class="pill">Music: On</button>
+</div>
+
+<!-- Dpad -->
+<div id="dpad" style="display:none">
+  <button id="padUp">▲</button>
+  <button id="padLeft">◀</button>
+  <button id="padRight">▶</button>
+  <button id="padDown">▼</button>
+</div>
+
+<!-- MENU / SIGNIN -->
+<div id="menu" class="panel show">
+  <div class="box" style="text-align:center;max-width:420px">
+    <h1>Simitaur Adventure</h1>
+    <p style="opacity:.9;margin-bottom:12px">Explore, catch, and battle Simitaurs. Upload sprites in Settings.</p>
+    <div id="signin-area">
+      <input id="playerName" placeholder="Player name" style="padding:8px;width:80%;margin-bottom:8px"><br>
+      <input id="playerPass" placeholder="Password" type="password" style="padding:8px;width:80%"><br>
+      <label style="display:flex;align-items:center;justify-content:center;margin-top:8px"><input id="rememberMe" type="checkbox" style="margin-right:8px"> Remember Me</label>
+      <div class="row" style="justify-content:center;margin-top:12px">
+        <button id="btnSignIn" class="btn">Sign In</button>
+        <button id="btnGuest" class="btn">Play as Guest</button>
+      </div>
+    </div>
+
+    <div id="menu-main" style="display:none;margin-top:10px" class="row">
+      <button id="btnStart" class="btn" style="padding:10px 16px">Start Game</button>
+      <button id="btnOpenSettings" class="btn">Settings</button>
+      <button id="btnOpenDexPanel" class="btn">SimDex</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings -->
+<div id="settings" class="panel">
+  <div class="box" style="min-width:320px">
+    <h2>Settings & Uploads</h2>
+    <p>Drop your own sprites. They’ll show in world, battles, and SimDex.</p>
+    <div class="grid" style="display:grid;grid-template-columns:1fr;gap:8px">
+      <label>Player Sprite<input id="filePlayer" type="file" accept="image/*"></label>
+      <label>Charcoal (NPC) Sprite<input id="fileNPC" type="file" accept="image/*"></label>
+      <label>SimNet (catch image)<input id="fileNet" type="file" accept="image/*"></label>
+      <label>Frostaur Sprite (Type 1)<input class="fileSim" data-id="0" type="file" accept="image/*"></label>
+      <label>Rockaur Sprite (Type 2)<input class="fileSim" data-id="1" type="file" accept="image/*"></label>
+      <label>Leafaur Sprite (Type 3)<input class="fileSim" data-id="2" type="file" accept="image/*"></label>
+    </div>
+    <div style="text-align:right;margin-top:12px"><button id="btnCloseSettings" class="btn">Close</button></div>
+  </div>
+</div>
+
+<!-- SimDex -->
+<div id="dex" class="panel">
+  <div class="box" style="max-width:920px">
+    <h2>Your SimDex</h2>
+    <div id="dexGrid"></div>
+    <div style="text-align:center;margin-top:10px"><button id="btnCloseDex" class="btn">Close</button></div>
+  </div>
+</div>
+
+<!-- Encounter panel -->
+<div id="encounterPanel" class="panel">
+  <div class="box">
+    <h2 id="encounterTitle">Encounter</h2>
+    <div class="row" style="justify-content:center">
+      <button id="btnTalk" class="btn">Talk</button>
+      <button id="btnFight" class="btn">Battle</button>
+      <button id="btnCatchSim" class="btn">Catch (SimNet)</button>
+      <button id="btnRun" class="btn danger">Run</button>
+    </div>
+  </div>
+</div>
+
+<!-- Choose Sim for battle -->
+<div id="chooseSimPanel" class="panel">
+  <div class="box" style="max-width:520px">
+    <h2>Choose a Sim to battle</h2>
+    <div id="chooseSimList" class="row" style="justify-content:center"></div>
+    <div style="text-align:center;margin-top:8px"><button id="btnCancelChoose" class="btn">Cancel</button></div>
+  </div>
+</div>
+
+<!-- Battle panel -->
+<div id="battlePanel" class="panel">
+  <div class="box">
+    <h2 id="battleTitle">Battle</h2>
+    <div class="row" style="justify-content:center;gap:20px">
+      <div style="text-align:center">
+        <div id="playerLabel" style="font-weight:700">You</div>
+        <div class="hp"><div id="hpYou" class="fill"></div></div>
+      </div>
+      <div style="text-align:center">
+        <div id="enemyLabel" style="font-weight:700">Enemy</div>
+        <div class="hp"><div id="hpEnemy" class="fill"></div></div>
+      </div>
+    </div>
+    <div id="battleButtons" class="row" style="justify-content:center;margin-top:8px"></div>
+    <div style="text-align:center;margin-top:10px"><button id="btnRunBattle" class="btn danger">Run</button></div>
+  </div>
+</div>
+
+<script>
+/* ========= Full integrated game ========= */
+(() => {
+  // Canvas & world
+  const cvs = document.getElementById('game'), ctx = cvs.getContext('2d');
+  const TILE = 64, VIEW_W = 8, VIEW_H = 10, MAP_W = 100, MAP_H = 100;
+  cvs.width = VIEW_W * TILE; cvs.height = VIEW_H * TILE;
+
+  // State
+  let mode = 'menu'; // menu, world, battle, encounter
+  let player = { x: Math.floor(MAP_W/2), y: Math.floor(MAP_H/2), hp: 100, maxHp: 100, img: null, sims: [], xp:0, name:'', pass:'' };
+  let npc = { x: Math.floor(MAP_W/2)+3, y: Math.floor(MAP_H/2), img: null };
+  const types = [
+    { id:0, name:'Frostaur', img:null, src:'', baseRarityWeights:[60,25,10,3,1,1] },
+    { id:1, name:'Rockaur',  img:null, src:'', baseRarityWeights:[40,30,18,8,3,1] },
+    { id:2, name:'Leafaur',  img:null, src:'', baseRarityWeights:[30,30,20,12,6,2] }
+  ];
+  let sims = []; // wild on map
+  let simdex = {}; // caught index
+  let currentEncounter = null; // 'npc' or sim object
+  let battlePlayerSim = null, battleEnemySim = null;
+  let netImage = null;
+
+  // -------- 8-bit Audio (WebAudio) --------
+  const AC = window.AudioContext || window.webkitAudioContext;
+  const audio = new AC();
+  let musicOn = true, musicToken = 0;
+  function ensureAudio(){ if(audio.state==='suspended') audio.resume(); }
+  function tone(freq, dur=0.14, type='square', vol=0.045){
+    const o = audio.createOscillator()
+}})
