@@ -187,6 +187,20 @@
   const audio = new AC();
   let musicOn = true, musicToken = 0;
   function ensureAudio(){ if(audio.state==='suspended') audio.resume(); }
-  function tone(freq, dur=0.14, type='square', vol=0.045){
-    const o = audio.createOscillator()
-}})
+  function tone(freq, dur=0.14, type='square', vol=0.045) {
+    ensureAudio();
+    const osc = audio.createOscillator();
+    const gain = audio.createGain();
+  
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, audio.currentTime);
+  
+    gain.gain.setValueAtTime(vol, audio.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + dur);
+  
+    osc.connect(gain);
+    gain.connect(audio.destination);
+  
+    osc.start();
+    osc.stop(audio.currentTime + dur);
+  }
