@@ -180,15 +180,721 @@
       </div>
       <div style="text-align:center">
         <div id="enemyLabel" class="label">Enemy</div>
-        <div <div style="text-align:center">
-  <div id="enemyLabel" class="label">Enemy</div>
-  <div class="hp"><div id="hpEnemy" class="fill"></div></div>
+        <div class="hp"><div id="hpEnemy" class="fill"></div></div>
+      </div>
+    </div>
+    <div id="battleButtons" class="row" style="justify-content:center;margin-top:10px"></div>
+    <div style="text-align:center;margin-top:10px"><button id="btnRunBattle" class="btn danger">Run</button></div>
+  </div>
 </div>
-</div> <!-- end row -->
 
-<div id="battleButtons" class="row" style="justify-content:center;margin-top:10px"></div>
-<div style="text-align:center;margin-top:12px">
-  <button id="btnRunBattle" class="btn danger">Run</button>
-</div>
-</div>
-</div>
+<script>
+/* ===========================================================
+   Simitaur Adventure — Full Self-Contained Game
+   - 100x100 map, renders 10x8 tiles (640x512 canvas)
+   - One-tile step movement (keys + D-pad)
+   - NPC "Charcoal" with dialogue + battle
+   - Wild Simitaurs with rarity sparkles + sizes/weights/attacks
+   - Turn-based battles; choose team member from SimDex
+   - Catch system with SimNet animation
+   - SimDex panel; click entries for info
+   - Settings: Upload your own sprites (Player, NPC, Net, up to 6 Sim slots)
+   - 8-bit music + SFX via Web Audio API
+   - Local save (Remember Me)
+   =========================================================== */
+
+(() => {
+  /* ---------- Canvas & View ---------- */
+  const cvs = document.getElementById('game'), ctx = cvs.getContext('2d');
+  const TILE = 64;                // tile pixel size on canvas
+  const VIEW_W = 10, VIEW_H = 8;  // tiles visible at once (canvas is 640x512)
+  const MAP_W = 100, MAP_H = 100;
+
+  // State
+  let mode = 'menu'; // menu, world, battle
+  let player = {
+    x: Math.floor(MAP_W/2), y: Math.floor(MAP_H/2),
+    hp: 100, maxHp: 100, img: null, sims: [], xp:0, name:'', pass:''
+  };
+  // Place NPC near center
+  let npc = { x: Math.floor(MAP_W/2)+3, y: Math.floor(MAP_H/2), img: null };
+
+  // Sim Types — you can replace icons via Settings
+  const types = [
+    { id:0, name:'Frostaur', img:null, src:'', baseRarityWeights:[60,25,10,3,1,1] },
+    { id:1, name:'Rockaur',  img:null, src:'', baseRarityWeights:[40,30,18,8,3,1] },
+    { id:2, name:'Leafaur',  img:null, src:'', baseRarityWeights:[30,30,20,12,6,2] },
+    { id:3, name:'Stormaur', img:null, src:'', baseRarityWeights:[36,28,20,10,5,1] },
+    { id:4, name:'Flametaur',img:null, src:'', baseRarityWeights:[42,30,16,8,3,1] },
+    { id:5, name:'Aquataur', img:null, src:'', baseRarityWeights:[34,30,20,10,5,1] }
+  ];
+
+  let sims = [];           // wild creatures on map
+  let simdex = {};         // caught index
+  let currentEncounter = null; // 'npc' or sim object
+  let battlePlayerSim = null, battleEnemySim = null;
+  let netImage = null;     // for catch animation
+
+  /* ---------- Audio: Web Audio 8-bit Music & SFX ---------- */
+  const AC = window.AudioContext || window.webkitAudioContext;
+  const audio = new AC();
+  let musicOn = true, sfxOn = true, musicToken = 0;
+
+  function ensureAudio(){ if(audio.state === 'suspended') audio.resume(); }
+
+  // Simple oscillator tone
+  function tone(freq, dur=0.14, type='square', vol=0.05){
+    if(!sfxOn) return;
+    const t0 = audio.currentTime;
+    const o = audio.createOscillator(), g = audio.createGain();
+    o.type = type; o.frequency.value = freq; g.gain.value = vol;
+    o.connect(g); g.connect(audio.destination);
+    o.start(t0);
+    // quick envelope to avoid clicks
+    const a = 0.005, r = 0.03;
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(vol, t0 + a);
+    g.gain.linearRampToValueAtTime(0.0001, t0 + dur - r);
+    o.stop(t0 + dur);
+  }
+
+  // SFX set
+  function sfxStep(){ tone(220 + Math.random()*20, .06, 'triangle', .05); }
+  function sfxAtk(){ tone(740, .1, 'square', .07); tone(620, .07, 'square', .06); }
+  function sfxBattleStart(){ tone(330,.08,'square',.07); setTimeout(()=>tone(660,.12,'square',.07),80); }
+  function sfxCatch(){ tone(520, .22, 'square', .08); setTimeout(()=>tone(880,.12,'square',.06),140); }
+  function sfxWin(){ tone(880, .14, 'sawtooth', .07); setTimeout(()=>tone(660,.14,'square',.05),120); }
+  function sfxEscape(){ tone(180, .12,'triangle', .05); }
+
+  // Background chiptune melody (procedural)
+  // Simple 8-bit loop: chord arps + bass
+  function startMusic(){
+    if(!musicOn) return;
+    ensureAudio();
+    const token = ++musicToken;
+    const key = [196,220,247,262,294,330,349,392]; // G-ish pentatonic-ish
+    const tempo = 128; // bpm
+    const spb = 60/tempo; // seconds per beat
+    let step = 0;
+
+    (function loop(){
+      if(!musicOn || token !== musicToken) return;
+
+      const t0 = audio.currentTime + 0.02;
+      // Bass every 1/2 bar
+      const bassSeq = [98, 98, 110, 123, 98, 98, 130, 147]; // supportive
+      const bass = bassSeq[step % bassSeq.length];
+      scheduleBass(bass, t0, spb);
+
+      // Melody arpeggio
+      const chord = [
+        [ key[0], key[2], key[4] ],
+        [ key[1], key[3], key[5] ],
+        [ key[2], key[4], key[6] ],
+        [ key[3], key[5], key[7] ],
+      ][(Math.floor(step/2))%4];
+      scheduleArp(chord, t0, spb);
+
+      // Snare-ish click
+      schedulePerc(t0+spb*0.5);
+      schedulePerc(t0+spb*1.5);
+
+      step++;
+      setTimeout(loop, spb*1000*2); // schedule every 2 beats
+    })();
+  }
+
+  function scheduleBass(freq, t0, spb){
+    const o = audio.createOscillator(), g = audio.createGain();
+    o.type='square'; o.frequency.value = freq;
+    g.gain.value = 0.06;
+    o.connect(g); g.connect(audio.destination);
+    const a=0.005, d=0.08, s=0.02, r=0.08;
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(0.08, t0+a);
+    g.gain.linearRampToValueAtTime(0.03, t0+d);
+    g.gain.setValueAtTime(0.03, t0+spb*1.8);
+    g.gain.linearRampToValueAtTime(0.0001, t0+spb*2-r);
+    o.start(t0);
+    o.stop(t0+spb*2);
+  }
+
+  function scheduleArp(notes, t0, spb){
+    const times = [0, spb*0.5, spb*1.0, spb*1.5];
+    times.forEach((off,i)=>{
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.type='triangle'; o.frequency.value = notes[i%notes.length];
+      g.gain.value = 0.05;
+      o.connect(g); g.connect(audio.destination);
+      const a=0.005, r=0.04;
+      g.gain.setValueAtTime(0, t0+off);
+      g.gain.linearRampToValueAtTime(0.06, t0+off+a);
+      g.gain.linearRampToValueAtTime(0.0001, t0+off+spb*0.45-r);
+      o.start(t0+off);
+      o.stop(t0+off+spb*0.5);
+    });
+  }
+
+  function schedulePerc(t){
+    const n = audio.createBufferSource();
+    const len = 2200;
+    const buf = audio.createBuffer(1, len, audio.sampleRate);
+    const data = buf.getChannelData(0);
+    for(let i=0;i<len;i++){
+      data[i] = (Math.random()*2-1) * Math.pow(1-i/len,2); // noise with decay
+    }
+    n.buffer = buf;
+    const g = audio.createGain();
+    g.gain.value = 0.06;
+    n.connect(g); g.connect(audio.destination);
+    n.start(t);
+  }
+
+  // Music toggle logic
+  function toggleMusic(){
+    musicOn = !musicOn;
+    document.getElementById('btnMusic').textContent = 'Music: ' + (musicOn ? 'On' : 'Off');
+    if(musicOn){ startMusic(); } else { musicToken++; }
+  }
+
+  /* ---------- Save / Load ---------- */
+  const SAVE_KEY = 'simitaur_save_v2';
+  function saveGame(){
+    try{
+      const store = {
+        player:{
+          name: player.name, pass: player.pass,
+          sims: player.sims.map(s=>({
+            typeId:s.type.id, hp:s.hp, maxHp:s.maxHp, attacks:s.attacks,
+            rarity:s.rarity, size:s.size, weight:s.weight, src: s.type.src || ''
+          }))
+        },
+        simdex
+      };
+      localStorage.setItem(SAVE_KEY, JSON.stringify(store));
+    }catch(e){ console.warn('save failed', e); }
+  }
+  function loadGame(){
+    try{
+      const raw = localStorage.getItem(SAVE_KEY); if(!raw) return false;
+      const obj = JSON.parse(raw); if(!obj?.player?.name) return false;
+      player.name = obj.player.name; player.pass = obj.player.pass || '';
+      player.sims = (obj.player.sims || []).map(d => ({
+        type: types.find(t=>t.id===d.typeId) || types[0],
+        hp:d.hp, maxHp:d.maxHp, attacks:d.attacks||[{name:'Punch',dmg:10}],
+        rarity:d.rarity, size:d.size, weight:d.weight
+      }));
+      simdex = obj.simdex || {};
+      return true;
+    }catch(e){ console.warn('load fail', e); return false; }
+  }
+  if(loadGame()){
+    document.getElementById('playerName').value = player.name;
+    document.getElementById('menu-main').style.display = 'flex';
+    document.getElementById('signin-area').style.display = 'none';
+    document.getElementById('rememberMe').checked = true;
+  }
+
+  /* ---------- Rarities ---------- */
+  const RARITIES = ['Common','Uncommon','Rare','Legendary','Mythic','Exotic'];
+  function weightedRarity(weights){
+    const sum = weights.reduce((a,b)=>a+b,0);
+    let r = Math.random()*sum;
+    for(let i=0;i<weights.length;i++){ if(r<weights[i]) return i; r -= weights[i]; }
+    return weights.length-1;
+  }
+
+  /* ---------- World Generation ---------- */
+  // Basic grass with random flowers to add detail
+  const flora = new Set();
+  for(let i=0;i<2200;i++){
+    flora.add((Math.floor(Math.random()*MAP_W)<<16) + Math.floor(Math.random()*MAP_H));
+  }
+
+  function spawnSims(){
+    sims.length = 0;
+    for(let y=0;y<MAP_H;y++){
+      for(let x=0;x<MAP_W;x++){
+        if(Math.random() < 0.02 && !(x===player.x && y===player.y) && !(x===npc.x && y===npc.y)){
+          const t = types[Math.floor(Math.random()*types.length)];
+          const idx = weightedRarity(t.baseRarityWeights.slice());
+          const rarity = RARITIES[idx];
+          const hp = 24 + Math.floor(Math.random()*60);
+          const size = 1 + Math.floor(Math.random()*3);        // 1..3
+          const weight = 1 + Math.floor(Math.random()*5);      // 1..5
+          const attacksPool = [
+            {name:'Tackle',dmg:6+Math.floor(Math.random()*8)},
+            {name:'Bite',dmg:6+Math.floor(Math.random()*10)},
+            {name:'Swipe',dmg:7+Math.floor(Math.random()*9)},
+            {name:'Headbutt',dmg:8+Math.floor(Math.random()*8)},
+          ];
+          const attacks = [attacksPool[Math.floor(Math.random()*attacksPool.length)],
+                           attacksPool[Math.floor(Math.random()*attacksPool.length)]];
+          sims.push({ x,y, type: t, hp, maxHp: hp, attacks, rarity, size, weight });
+        }
+      }
+    }
+  }
+  spawnSims();
+
+  /* ---------- Drawing ---------- */
+  let sparklePhase = 0;
+
+  function draw(){
+    // world background tiles
+    const vx0 = player.x - Math.floor(VIEW_W/2);
+    const vy0 = player.y - Math.floor(VIEW_H/2);
+
+    for(let y=0;y<VIEW_H;y++){
+      for(let x=0;x<VIEW_W;x++){
+        const gx = vx0 + x;
+        const gy = vy0 + y;
+        // base grass
+        ctx.fillStyle = ((x+y)&1) ? '#88d892' : '#7bd083';
+        ctx.fillRect(x*TILE, y*TILE, TILE, TILE);
+
+        // flowers / detail
+        const key = (gx<<16) + gy;
+        if(flora.has(key)){
+          const fx = x*TILE + 8 + (gx*13+gy*7)%40;
+          const fy = y*TILE + 8 + (gx*5+gy*11)%40;
+          ctx.fillStyle = '#e4ffd9';
+          ctx.fillRect(fx,fy,4,4);
+          ctx.fillStyle = '#ff6b6b';
+          ctx.fillRect(fx+6,fy+2,3,3);
+        }
+      }
+    }
+
+    // NPC
+    const nx = npc.x - vx0, ny = npc.y - vy0;
+    if(nx>=0 && nx<VIEW_W && ny>=0 && ny<VIEW_H){
+      if(npc.img) ctx.drawImage(npc.img, nx*TILE, ny*TILE, TILE, TILE);
+      else { ctx.fillStyle='#f4a261'; ctx.fillRect(nx*TILE, ny*TILE, TILE, TILE); }
+      // name tag
+      ctx.fillStyle='rgba(0,0,0,.33)';
+      ctx.fillRect(nx*TILE, ny*TILE-18, TILE, 18);
+      ctx.fillStyle='#ffd166';
+      ctx.font='12px monospace';
+      ctx.fillText('Charcoal', nx*TILE+6, ny*TILE-6);
+    }
+
+    // Sims
+    sims.forEach(s=>{
+      const sx = s.x - vx0, sy = s.y - vy0;
+      if(sx>=0 && sx<VIEW_W && sy>=0 && sy<VIEW_H){
+        if(s.type.img) ctx.drawImage(s.type.img, sx*TILE, sy*TILE, TILE, TILE);
+        else {
+          const cols=['#ff595e','#8ac926','#1982c4','#ffd166','#6c5ce7','#00cec9'];
+          ctx.fillStyle=cols[s.type.id%cols.length];
+          ctx.fillRect(sx*TILE, sy*TILE, TILE, TILE);
+        }
+        // rarity effects (sparkles/borders)
+        drawRarityFX(s, sx, sy);
+      }
+    });
+
+    // player center
+    const px = Math.floor(VIEW_W/2)*TILE, py = Math.floor(VIEW_H/2)*TILE;
+    if(player.img) ctx.drawImage(player.img, px, py, TILE, TILE);
+    else { ctx.fillStyle='#1d3557'; ctx.fillRect(px, py, TILE, TILE); }
+
+    sparklePhase += 0.08;
+  }
+
+  function drawRarityFX(s, sx, sy){
+    const x = sx*TILE, y = sy*TILE;
+    ctx.save();
+    const p = sparklePhase + s.x*0.5 + s.y*0.3;
+
+    function sparkle(color, count=2){
+      for(let i=0;i<count;i++){
+        const t = (p*1.6 + i*1.7)%1;
+        const ox = Math.floor((Math.sin(p*3+i*2)*0.5+0.5)*(TILE-12))+6;
+        const oy = Math.floor((Math.cos(p*2+i*3)*0.5+0.5)*(TILE-12))+6;
+        ctx.fillStyle = color;
+        ctx.globalAlpha = 0.6 + 0.4*Math.sin(p*4+i);
+        ctx.fillRect(x+ox, y+oy, 4, 4);
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    switch(s.rarity){
+      case 'Common':         // blue sparkles
+        sparkle('#53a9ff', 2);
+        ctx.strokeStyle = 'rgba(120,180,255,0.4)'; ctx.lineWidth=2; ctx.strokeRect(x+2,y+2,TILE-4,TILE-4);
+        break;
+      case 'Uncommon':       // grey sparkles
+        sparkle('#a0a7ad', 3);
+        ctx.strokeStyle = '#a0a7ad'; ctx.lineWidth=2; ctx.strokeRect(x+2,y+2,TILE-4,TILE-4);
+        break;
+      case 'Rare':           // purple sparkles
+        sparkle('#a56cff', 3);
+        ctx.strokeStyle = '#a56cff'; ctx.lineWidth=3; ctx.strokeRect(x+2,y+2,TILE-4,TILE-4);
+        break;
+      case 'Legendary':      // gold shimmer border pulse
+        sparkle('#ffd166', 3);
+        const alpha=0.45 + Math.abs(Math.sin(p))*0.5;
+        ctx.strokeStyle=`rgba(255,215,0,${alpha})`; ctx.lineWidth=3; ctx.strokeRect(x+2, y+2, TILE-4, TILE-4);
+        break;
+      case 'Mythic':         // blue + purple
+        sparkle('#66ccff', 2);
+        sparkle('#b388ff', 2);
+        ctx.strokeStyle='rebeccapurple'; ctx.lineWidth=3; ctx.strokeRect(x+2, y+2, TILE-4, TILE-4);
+        break;
+      case 'Exotic':         // RGB rainbow border
+        const colors=['#ff0000','#ff7f00','#ffff00','#00ff00','#0000ff','#4b0082','#8f00ff'];
+        const c = colors[Math.floor((p*10)%colors.length)];
+        sparkle(c, 4);
+        ctx.strokeStyle=c; ctx.lineWidth=4; ctx.strokeRect(x+2,y+2,TILE-4,TILE-4);
+        break;
+    }
+    ctx.restore();
+  }
+
+  /* ---------- Movement ---------- */
+  function move(dx,dy){
+    if(mode !== 'world') return;
+    ensureAudio();
+    const nx = Math.max(0, Math.min(MAP_W-1, player.x + dx));
+    const ny = Math.max(0, Math.min(MAP_H-1, player.y + dy));
+    if(nx === player.x && ny === player.y) return;
+    player.x = nx; player.y = ny;
+    sfxStep();
+    checkTileInteraction();
+    draw();
+  }
+
+  // D-pad wiring + hold repeat
+  function wirePad(id,dx,dy){
+    const el = document.getElementById(id);
+    let interval;
+    const down = (e)=>{ e?.preventDefault(); move(dx,dy); interval = setInterval(()=>move(dx,dy), 150); };
+    const up   = ()=>{ clearInterval(interval); };
+    el.addEventListener('mousedown', down);
+    el.addEventListener('mouseup', up);
+    el.addEventListener('mouseleave', up);
+    el.addEventListener('touchstart', e=>{ down(e); }, {passive:false});
+    el.addEventListener('touchend', up);
+    el.addEventListener('click', e=>{ e.preventDefault(); }); // prevent double
+  }
+  wirePad('padUp',0,-1); wirePad('padDown',0,1); wirePad('padLeft',-1,0); wirePad('padRight',1,0);
+
+  // Keyboard
+  window.addEventListener('keydown', e=>{
+    if(mode !== 'world') return;
+    const k = e.key.toLowerCase();
+    if(k==='arrowup'||k==='w') move(0,-1);
+    if(k==='arrowdown'||k==='s') move(0,1);
+    if(k==='arrowleft'||k==='a') move(-1,0);
+    if(k==='arrowright'||k==='d') move(1,0);
+  });
+
+  /* ---------- UI Wiring: Menu / Signin ---------- */
+  document.getElementById('btnSignIn').addEventListener('click', ()=>{
+    const n = document.getElementById('playerName').value.trim();
+    const p = document.getElementById('playerPass').value;
+    if(!n || !p) return alert('Enter name and password');
+    player.name = n; player.pass = p;
+    if(document.getElementById('rememberMe').checked) saveGame();
+    document.getElementById('signin-area').style.display = 'none';
+    document.getElementById('menu-main').style.display = 'flex';
+  });
+  document.getElementById('btnGuest').addEventListener('click', ()=>{
+    player.name = 'Guest';
+    document.getElementById('signin-area').style.display = 'none';
+    document.getElementById('menu-main').style.display = 'flex';
+  });
+  document.getElementById('btnStart').addEventListener('click', ()=>{
+    mode = 'world';
+    panel('menu', false);
+    document.getElementById('hud').style.display = 'flex';
+    document.getElementById('dpad').style.display = isTouch() ? 'grid' : 'none';
+    draw();
+    startMusic();
+  });
+  document.getElementById('btnSignOut').addEventListener('click', ()=>{
+    localStorage.removeItem(SAVE_KEY);
+    location.reload();
+  });
+
+  /* ---------- Settings uploads ---------- */
+  function loadImgFromInput(el, cb){
+    const f = el.files?.[0]; if(!f) return;
+    const url = URL.createObjectURL(f);
+    const img = new Image();
+    img.onload = ()=>{ cb(img, url); draw(); };
+    img.src = url;
+  }
+  document.getElementById('filePlayer').addEventListener('change', e=> loadImgFromInput(e.target, (img)=> player.img = img ));
+  document.getElementById('fileNPC').addEventListener('change', e=> loadImgFromInput(e.target, (img)=> npc.img = img ));
+  document.getElementById('fileNet').addEventListener('change', e=> loadImgFromInput(e.target, (img)=> netImage = img ));
+  document.querySelectorAll('.fileSim').forEach(inp=>{
+    inp.addEventListener('change', e=>{
+      const id = Number(inp.dataset.id);
+      loadImgFromInput(e.target, (img,url)=>{ types[id].img = img; types[id].src = url; draw(); });
+    });
+  });
+  document.getElementById('btnOpenSettings').addEventListener('click', ()=>panel('settings', true));
+  document.getElementById('btnCloseSettings').addEventListener('click', ()=>panel('settings', false));
+  document.getElementById('btnSettings').addEventListener('click', ()=>panel('settings', true));
+
+  /* ---------- SimDex ---------- */
+  function buildDex(){
+    const grid = document.getElementById('dexGrid'); grid.innerHTML = '';
+    const keys = Object.keys(simdex);
+    if(!keys.length){ grid.innerHTML = '<p style="opacity:.8">No Simitaurs caught yet.</p>'; return; }
+    keys.forEach(k=>{
+      const d = simdex[k];
+      const el = document.createElement('div'); el.className = 'dexCard rarity-' + (d.rarity || 'Common');
+      const img = document.createElement('img'); img.src = d.src || '';
+      const info = document.createElement('div'); info.innerHTML = `<b>${d.name}</b><br>Rarity: ${d.rarity}<br>HP: ${d.hp}`;
+      el.appendChild(img); el.appendChild(info);
+      el.addEventListener('click', ()=> alert(`${d.name}\nRarity: ${d.rarity}\nHP: ${d.hp}\nSize: ${d.size}\nWeight: ${d.weight}`));
+      grid.appendChild(el);
+    });
+  }
+  document.getElementById('btnOpenDexPanel').addEventListener('click', ()=>{ buildDex(); panel('dex', true); });
+  document.getElementById('btnCloseDex').addEventListener('click', ()=>panel('dex', false));
+  document.getElementById('btnDex').addEventListener('click', ()=>{ buildDex(); panel('dex', true); });
+
+  /* ---------- Music toggle ---------- */
+  document.getElementById('btnMusic').addEventListener('click', toggleMusic);
+
+  /* ---------- Encounters ---------- */
+  function checkTileInteraction(){
+    // NPC
+    if(player.x === npc.x && player.y === npc.y){
+      currentEncounter = 'npc';
+      panel('encounterPanel', true);
+      document.getElementById('encounterTitle').textContent = 'Charcoal: Talk or Battle?';
+      document.getElementById('btnTalk').style.display = 'inline-block';
+      document.getElementById('btnFight').style.display = 'inline-block';
+      document.getElementById('btnCatchSim').style.display = 'none';
+      return;
+    }
+    // Wild
+    const wild = sims.find(s => s.x === player.x && s.y === player.y);
+    if(wild){
+      currentEncounter = wild;
+      panel('encounterPanel', true);
+      document.getElementById('encounterTitle').textContent = `A wild ${wild.type.name} (${wild.rarity}) appears!`;
+      document.getElementById('btnTalk').style.display = 'none';
+      document.getElementById('btnFight').style.display = 'inline-block';
+      document.getElementById('btnCatchSim').style.display = 'inline-block';
+      return;
+    }
+    currentEncounter = null;
+  }
+
+  // Encounter buttons
+  wire('btnRun', ()=>{ currentEncounter = null; panel('encounterPanel', false); sfxEscape(); });
+  wire('btnTalk', ()=>{
+    if(currentEncounter === 'npc'){
+      alert('Charcoal: Welcome! Catch Simitaurs and train them — some are incredibly rare! You can even upload your own sprites in Settings. Want to test your strength?');
+      panel('encounterPanel', false);
+      currentEncounter = null;
+    }
+  });
+
+  // Fight opens choose panel first
+  wire('btnFight', ()=>{
+    panel('encounterPanel', false);
+    openChooseSim((chosen)=>{
+      if(!chosen){ currentEncounter = null; return; }
+      battlePlayerSim = chosen;
+      if(currentEncounter === 'npc'){
+        const npcSim = randomNpcSim();
+        startBattleWithChosen(battlePlayerSim, npcSim);
+      } else if(currentEncounter){
+        startBattleWithChosen(battlePlayerSim, currentEncounter);
+      }
+    });
+  });
+
+  // Catch
+  wire('btnCatchSim', ()=>{
+    if(currentEncounter && currentEncounter !== 'npc') runCatchSequence(currentEncounter);
+  });
+
+  function randomNpcSim(){
+    const t = types[Math.floor(Math.random()*types.length)];
+    const hp = 40 + Math.floor(Math.random()*60);
+    const attacks = [
+      {name:'Smash',dmg:8+Math.floor(Math.random()*6)},
+      {name:'Roar',dmg:10+Math.floor(Math.random()*6)}
+    ];
+    return { type:t, hp, maxHp:hp, attacks, rarity:'Rare', size:2, weight:3 };
+  }
+
+  /* ---------- Catch animation & logic ---------- */
+  function captureChanceByRarity(r){
+    switch(r){
+      case 'Common': return 70;
+      case 'Uncommon': return 55;
+      case 'Rare': return 38;
+      case 'Legendary': return 20;
+      case 'Mythic': return 12;
+      case 'Exotic': return 6;
+      default: return 50;
+    }
+  }
+
+  function runCatchSequence(sim){
+    panel('encounterPanel', false);
+    const dur = 800; const start = performance.now(); const cx = cvs.width/2, cy = cvs.height/2;
+
+    function anim(now){
+      const t = Math.min(1,(now-start)/dur);
+      draw();
+
+      ctx.save();
+      const sy = cy - 40 * Math.sin(t*Math.PI);
+      const sx = cx;
+      if(netImage){
+        const s = 1 + 1.2*t;
+        ctx.drawImage(netImage, sx-48*s, sy-48*s, 96*s, 96*s);
+      } else {
+        ctx.strokeStyle='white'; ctx.lineWidth=3; ctx.beginPath();
+        ctx.arc(sx, sy, 36 + 30*t, Math.PI*0.2, Math.PI*0.8); ctx.stroke();
+      }
+      ctx.restore();
+
+      if(t<1) requestAnimationFrame(anim);
+      else {
+        sfxCatch();
+        const chance = captureChanceByRarity(sim.rarity);
+        if(Math.random()*100 < chance){
+          const id = sim.type.name + '-' + Date.now();
+          simdex[id] = { name: sim.type.name, rarity: sim.rarity, hp: sim.hp, size: sim.size, weight: sim.weight, src: sim.type.src || '' };
+          const idx = sims.indexOf(sim); if(idx>=0) sims.splice(idx,1);
+          player.sims.push({ type: sim.type, hp: sim.hp, maxHp: sim.maxHp, attacks: sim.attacks, rarity: sim.rarity, size: sim.size, weight: sim.weight });
+          player.xp = (player.xp||0)+10;
+          if(document.getElementById('rememberMe').checked) saveGame();
+          buildDex();
+          alert(`Caught ${sim.type.name} (${sim.rarity})!`);
+        } else alert(`${sim.type.name} escaped!`);
+      }
+    }
+    requestAnimationFrame(anim);
+  }
+
+  /* ---------- Battle System ---------- */
+  function startBattleWithChosen(playerSim, enemySource){
+    battleEnemySim = { ...enemySource, hp: enemySource.hp, maxHp: enemySource.maxHp, attacks: enemySource.attacks ? enemySource.attacks.slice() : (enemySource.attacks || []) };
+    if(!playerSim){ // ensure at least one
+      if(player.sims.length===0){
+        player.sims.push({ type: types[0], hp:40, maxHp:40, attacks:[{name:'Punch',dmg:10}], rarity:'Common', size:1, weight:1 });
+      }
+      playerSim = player.sims[0];
+    }
+    battlePlayerSim = playerSim;
+    panel('battlePanel', true);
+    populateBattleUI();
+    mode = 'battle';
+    sfxBattleStart();
+  }
+
+  function populateBattleUI(){
+    document.getElementById('battleTitle').textContent = `Battle vs ${battleEnemySim.type ? battleEnemySim.type.name : 'Enemy'}`;
+    document.getElementById('playerLabel').textContent = player.name || 'You';
+    document.getElementById('enemyLabel').textContent = battleEnemySim.type ? battleEnemySim.type.name : 'Enemy';
+    updateHPbars();
+    const div = document.getElementById('battleButtons'); div.innerHTML = '';
+    (battlePlayerSim.attacks || []).forEach(a=>{
+      const b = document.createElement('button'); b.className='btn'; b.textContent=a.name;
+      b.addEventListener('click', ()=> playerUseAttack(a));
+      b.addEventListener('touchstart', e=>{ e.preventDefault(); playerUseAttack(a); });
+      div.appendChild(b);
+    });
+    document.getElementById('btnRunBattle').onclick = ()=>{ panel('battlePanel', false); mode = 'world'; battleEnemySim = null; battlePlayerSim = null; sfxEscape(); };
+  }
+
+  function updateHPbars(){
+    if(battlePlayerSim) document.getElementById('hpYou').style.width = Math.max(0,(battlePlayerSim.hp/battlePlayerSim.maxHp*100))+'%';
+    if(battleEnemySim) document.getElementById('hpEnemy').style.width = Math.max(0,(battleEnemySim.hp/battleEnemySim.maxHp*100))+'%';
+  }
+
+  function playerUseAttack(a){
+    if(!battleEnemySim||!battlePlayerSim) return;
+    ensureAudio(); sfxAtk();
+    const base = a.dmg || (8+Math.floor(Math.random()*6));
+    const dmg = Math.max(1, base + Math.floor((Math.random()-0.5)*4));
+    battleEnemySim.hp = Math.max(0, battleEnemySim.hp - dmg);
+    updateHPbars();
+    if(battleEnemySim.hp<=0){ setTimeout(()=>{ sfxWin(); onBattleWin(); }, 220); return; }
+    setTimeout(()=> enemyTurn(), 420);
+  }
+
+  function enemyTurn(){
+    if(!battleEnemySim||!battlePlayerSim) return;
+    const atk = (battleEnemySim.attacks && battleEnemySim.attacks.length) ? battleEnemySim.attacks[Math.floor(Math.random()*battleEnemySim.attacks.length)] : {name:'Tackle',dmg:6};
+    ensureAudio(); sfxAtk();
+    const dmg = Math.max(1, atk.dmg + Math.floor((Math.random()-0.5)*4));
+    battlePlayerSim.hp = Math.max(0, battlePlayerSim.hp - dmg);
+    updateHPbars();
+    if(battlePlayerSim.hp<=0){ setTimeout(()=> onBattleLose(), 260); }
+  }
+
+  function onBattleWin(){
+    panel('battlePanel', false);
+    if(currentEncounter && currentEncounter !== 'npc'){
+      player.xp = (player.xp||0)+12;
+      const idx = sims.indexOf(currentEncounter); if(idx>=0) sims.splice(idx,1);
+      simdex[currentEncounter.type.name + '-' + Date.now()] = {
+        name: currentEncounter.type.name,
+        rarity: currentEncounter.rarity, hp: currentEncounter.hp,
+        size: currentEncounter.size, weight: currentEncounter.weight,
+        src: currentEncounter.type.src || ''
+      };
+      player.sims.push({ type: currentEncounter.type, hp: currentEncounter.hp, maxHp: currentEncounter.maxHp, attacks: currentEncounter.attacks, rarity: currentEncounter.rarity, size: currentEncounter.size, weight: currentEncounter.weight });
+      if(document.getElementById('rememberMe').checked) saveGame();
+      buildDex();
+      alert(`Victory! Claimed ${currentEncounter.type.name} and added to SimDex + team.`);
+      currentEncounter = null;
+    } else {
+      player.xp = (player.xp||0)+18; alert('You won the NPC battle! XP gained.');
+    }
+    battleEnemySim = null; battlePlayerSim = null; mode = 'world';
+  }
+
+  function onBattleLose(){
+    panel('battlePanel', false);
+    alert('You lost. Your Sim recovers to half HP.');
+    if(player.sims[0]) player.sims[0].hp = Math.max(1, Math.floor(player.sims[0].maxHp * 0.5));
+    battleEnemySim = null; battlePlayerSim = null; mode = 'world';
+  }
+
+  /* ---------- Choose Sim Panel ---------- */
+  function openChooseSim(cb){
+    const list = document.getElementById('chooseSimList'); list.innerHTML = '';
+    if(player.sims.length===0){ alert('No sims in your team!'); cb(null); return; }
+    player.sims.forEach((s,i)=>{
+      const el = document.createElement('button'); el.className='btn'; el.textContent = `${s.type.name} (HP:${s.hp}/${s.maxHp})`;
+      el.addEventListener('click', ()=>{ document.getElementById('chooseSimPanel').classList.remove('show'); cb(s); });
+      list.appendChild(el);
+    });
+    document.getElementById('btnCancelChoose').onclick = ()=>{ document.getElementById('chooseSimPanel').classList.remove('show'); cb(null); };
+    panel('chooseSimPanel', true);
+  }
+
+  /* ---------- Panel helper ---------- */
+  function panel(id, show){ document.querySelectorAll('.panel').forEach(p=>p.classList.remove('show')); if(show) document.getElementById(id).classList.add('show'); }
+  function wire(id, fn){ const el=document.getElementById(id); el.addEventListener('click', fn); el.addEventListener('touchstart', e=>{ e.preventDefault(); fn(); }, {passive:false}); }
+
+  /* ---------- Render Loop ---------- */
+  (function renderLoop(){
+    if(mode==='world') draw();
+    requestAnimationFrame(renderLoop);
+  })();
+
+  /* ---------- Utils ---------- */
+  function isTouch(){ return /Mobi|Android|iPhone|iPad|iPod|Tablet/i.test(navigator.userAgent); }
+
+  // Startup: if entering world directly via saved state, ensure D-pad visibility on touch
+  if(mode==='world' && isTouch()){ document.getElementById('dpad').style.display = 'grid'; }
+
+})(); // IIFE end
+</script>
+</body>
+</html>
