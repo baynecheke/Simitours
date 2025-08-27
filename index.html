@@ -1,9 +1,9 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
-<title>Simitaur Adventure — Complete</title>
+<title>Simitaur Adventure — Full (Smooth Camera, Visible Sims Only)</title>
 <style>
   :root{
     --bg:#0e1610; --panel:rgba(6,8,6,.92);
@@ -195,8 +195,7 @@
 <script>
 /* ===========================================================
    Simitaur Adventure — Full Integrated Game
-   Features implemented per user's request.
-   Single-file game, no external assets required.
+   Smooth camera + visible sims only (no hidden grass encounters)
    =========================================================== */
 
 (() => {
@@ -214,7 +213,7 @@
   };
   const npc = { x: Math.floor(MAP_W/2) + 3, y: Math.floor(MAP_H/2), img: null, name: 'Charcoal' };
   let netImage = null;
-  let sims = [];            // wild sims positions
+  let sims = [];            // visible wild sims positions (only these cause encounters)
   let simdex = {};          // caught index
   let currentEncounter = null; // 'npc' or sim object
   let battlePlayerSim = null, battleEnemySim = null;
@@ -381,84 +380,110 @@
   }
 
   function spawnSims(){
-    sims = []; // reset
-    for(let y=0;y<MAP_H;y++){
-      for(let x=0;x<MAP_W;x++){
-        if(Math.random() < 0.018 && !(x===player.x && y===player.y) && !(x===npc.x && y===npc.y)){
-          const t = types[Math.floor(Math.random()*types.length)];
-          const idx = weightedRarity(t.baseRarityWeights.slice());
-          const rarity = RARITIES[idx];
-          const hp = 24 + Math.floor(Math.random()*60);
-          const size = 1 + Math.floor(Math.random()*3); // 1..3
-          const weight = 1 + Math.floor(Math.random()*5);
-          const attacksPool = [
-            {name:'Tackle',dmg:6+Math.floor(Math.random()*8)},
-            {name:'Bite',dmg:6+Math.floor(Math.random()*10)},
-            {name:'Swipe',dmg:7+Math.floor(Math.random()*9)},
-            {name:'Headbutt',dmg:8+Math.floor(Math.random()*8)},
-          ];
-          const attacks = [attacksPool[Math.floor(Math.random()*attacksPool.length)],
-                           attacksPool[Math.floor(Math.random()*attacksPool.length)]];
-          sims.push({ x,y, type: t, hp, maxHp: hp, attacks, rarity, size, weight });
-        }
-      }
+    sims = []; // reset: visible sims only
+    // spawn a moderate number of visible sims around the map but not on player or NPC
+    const count = 350; // you can adjust how many visible sims exist on map
+    for(let i=0;i<count;i++){
+      let x = Math.floor(Math.random()*MAP_W);
+      let y = Math.floor(Math.random()*MAP_H);
+      if((x===player.x && y===player.y) || (x===npc.x && y===npc.y)){ i--; continue; }
+      const t = types[Math.floor(Math.random()*types.length)];
+      const idx = weightedRarity(t.baseRarityWeights.slice());
+      const rarity = RARITIES[idx];
+      const hp = 24 + Math.floor(Math.random()*60);
+      const size = 1 + Math.floor(Math.random()*3); // 1..3
+      const weight = 1 + Math.floor(Math.random()*5);
+      const attacksPool = [
+        {name:'Tackle',dmg:6+Math.floor(Math.random()*8)},
+        {name:'Bite',dmg:6+Math.floor(Math.random()*10)},
+        {name:'Swipe',dmg:7+Math.floor(Math.random()*9)},
+        {name:'Headbutt',dmg:8+Math.floor(Math.random()*8)},
+      ];
+      const attacks = [attacksPool[Math.floor(Math.random()*attacksPool.length)],
+                       attacksPool[Math.floor(Math.random()*attacksPool.length)]];
+      sims.push({ x,y, type: t, hp, maxHp: hp, attacks, rarity, size, weight });
     }
   }
   spawnSims();
 
+  // ----- Camera (smooth follow) -----
+  // camera stored in tile coordinates (floats), not pixels
+  let camX = player.x, camY = player.y;
+
   // ----- Drawing -----
   let sparklePhase = 0;
   function draw(){
-    // center player; compute viewport top-left
-    const vx0 = player.x - Math.floor(VIEW_W/2);
-    const vy0 = player.y - Math.floor(VIEW_H/2);
+    // smooth camera lerp toward player (tweak factor for smoothness)
+    camX += (player.x - camX) * 0.15;
+    camY += (player.y - camY) * 0.15;
+
+    // top-left world coordinate in tiles (we'll floor to pick which tiles to draw)
+    const worldLeft = Math.floor(camX - VIEW_W/2);
+    const worldTop  = Math.floor(camY - VIEW_H/2);
+
+    // but drawing uses fractional offset so scrolling is smooth
+    const subX = (camX - Math.floor(camX)); // fraction within tile
+    const subY = (camY - Math.floor(camY));
+
+    // clear
+    ctx.clearRect(0,0,cvs.width,cvs.height);
 
     // draw tiles (green checkered)
     for(let ty=0; ty<VIEW_H; ty++){
       for(let tx=0; tx<VIEW_W; tx++){
-        const gx = vx0 + tx, gy = vy0 + ty;
+        const gx = worldLeft + tx, gy = worldTop + ty;
         // checker greens
         ctx.fillStyle = ((gx+gy)&1) ? '#7cc57a' : '#67b86a';
-        ctx.fillRect(tx*TILE, ty*TILE, TILE, TILE);
-        // flowers detail
+        const screenX = (tx - (camX - Math.floor(camX) - (VIEW_W/2 - Math.floor(VIEW_W/2)))) * TILE; // alternative fractional offset
+        const screenY = (ty - (camY - Math.floor(camY) - (VIEW_H/2 - Math.floor(VIEW_H/2)))) * TILE;
+        // simpler compute: position relative to cam: (world - cam + VIEW/2) * TILE
+        const px = (gx - camX + VIEW_W/2) * TILE;
+        const py = (gy - camY + VIEW_H/2) * TILE;
+        ctx.fillRect(px, py, TILE, TILE);
+
+        // flowers detail (use deterministic flora set)
         const k = (gx<<16) + gy;
-        if(flora.has(k) && Math.random() < 0.12){
+        if(flora.has(k) && Math.random() < 0.06){
           ctx.fillStyle = '#eafde8';
-          ctx.fillRect(tx*TILE+6, ty*TILE+8, 3, 3);
+          ctx.fillRect(px+6, py+8, 3, 3);
           ctx.fillStyle = '#ff6b6b';
-          ctx.fillRect(tx*TILE+10, ty*TILE+12, 3, 3);
+          ctx.fillRect(px+10, py+12, 3, 3);
         }
       }
     }
 
     // NPC
-    const nx = npc.x - vx0, ny = npc.y - vy0;
-    if(nx>=0 && nx<VIEW_W && ny>=0 && ny<VIEW_H){
-      if(npc.img) ctx.drawImage(npc.img, nx*TILE, ny*TILE, TILE, TILE);
-      else { ctx.fillStyle='#f4a261'; ctx.fillRect(nx*TILE, ny*TILE, TILE, TILE); }
+    const nx = npc.x - camX + VIEW_W/2, ny = npc.y - camY + VIEW_H/2;
+    if(nx>-1 && nx<VIEW_W+1 && ny>-1 && ny<VIEW_H+1){
+      const sx = nx*TILE, sy = ny*TILE;
+      if(npc.img) ctx.drawImage(npc.img, sx, sy, TILE, TILE);
+      else { ctx.fillStyle='#f4a261'; ctx.fillRect(sx, sy, TILE, TILE); }
       // name tag above
-      ctx.fillStyle='rgba(0,0,0,0.45)'; ctx.fillRect(nx*TILE, ny*TILE-18, TILE, 18);
-      ctx.fillStyle='#ffd166'; ctx.font='12px monospace'; ctx.fillText(npc.name, nx*TILE+6, ny*TILE-6);
+      ctx.fillStyle='rgba(0,0,0,0.45)'; ctx.fillRect(sx, sy-18, TILE, 18);
+      ctx.fillStyle='#ffd166'; ctx.font='12px monospace'; ctx.fillText(npc.name, sx+6, sy-6);
     }
 
-    // sims
+    // sims (visible only)
     sims.forEach(s => {
-      const sx = s.x - vx0, sy = s.y - vy0;
-      if(sx>=0 && sx<VIEW_W && sy>=0 && sy<VIEW_H){
-        if(s.type.img) ctx.drawImage(s.type.img, sx*TILE, sy*TILE, TILE, TILE);
+      const sx = s.x - camX + VIEW_W/2, sy = s.y - camY + VIEW_H/2;
+      if(sx>=-1 && sx<VIEW_W+1 && sy>=-1 && sy<VIEW_H+1){
+        const drawX = sx*TILE, drawY = sy*TILE;
+        if(s.type.img) ctx.drawImage(s.type.img, drawX, drawY, TILE, TILE);
         else {
           const cols=['#ff595e','#8ac926','#1982c4','#ffd166','#6c5ce7','#00cec9'];
           ctx.fillStyle = cols[s.type.id % cols.length];
-          ctx.fillRect(sx*TILE, sy*TILE, TILE, TILE);
+          ctx.fillRect(drawX, drawY, TILE, TILE);
         }
         drawRarityFX(s, sx, sy);
       }
     });
 
-    // player centered
-    const px = Math.floor(VIEW_W/2)*TILE, py = Math.floor(VIEW_H/2)*TILE;
-    if(player.img) ctx.drawImage(player.img, px, py, TILE, TILE);
-    else { ctx.fillStyle='#1d3557'; ctx.fillRect(px, py, TILE, TILE); }
+    // player (draw on top). With a smooth camera the player may not be pixel-perfect center, but
+    // we still draw it at the screen position of the player's world position.
+    const playerScreenX = (player.x - camX + VIEW_W/2) * TILE;
+    const playerScreenY = (player.y - camY + VIEW_H/2) * TILE;
+    if(player.img) ctx.drawImage(player.img, playerScreenX, playerScreenY, TILE, TILE);
+    else { ctx.fillStyle='#1d3557'; ctx.fillRect(playerScreenX, playerScreenY, TILE, TILE); }
 
     sparklePhase += 0.08;
   }
@@ -489,7 +514,7 @@
 
   // ----- Movement and input -----
   function move(dx,dy){
-    if(mode !== 'world') return;
+    if(mode === 'battle') return; // disable map movement during battles
     ensureAudio();
     const nx = Math.max(0, Math.min(MAP_W-1, player.x + dx));
     const ny = Math.max(0, Math.min(MAP_H-1, player.y + dy));
@@ -512,9 +537,8 @@
   }
   wirePad('padUp',0,-1); wirePad('padDown',0,1); wirePad('padLeft',-1,0); wirePad('padRight',1,0);
 
-  // keyboard
+  // keyboard (now always works; movement disabled during battle)
   window.addEventListener('keydown', e=>{
-    if(mode !== 'world') return;
     const k = e.key.toLowerCase();
     if(k==='arrowup'||k==='w') move(0,-1);
     if(k==='arrowdown'||k==='s') move(0,1);
@@ -618,7 +642,7 @@
       document.getElementById('btnCatchSim').style.display = 'none';
       return;
     }
-    // Wild Sim
+    // Visible Wild Sim only (no hidden grass encounters)
     const wild = sims.find(s => s.x === player.x && s.y === player.y);
     if(wild){
       currentEncounter = wild;
@@ -689,7 +713,6 @@
     // swooping net animation toward center (where player is)
     const dur = 900; const start = performance.now();
     const cx = cvs.width/2, cy = cvs.height/2;
-    // remove sim from map visually only after successful capture or escape? We'll keep until capture success remove
     function anim(now){
       const t = Math.min(1,(now-start)/dur);
       draw();
@@ -706,9 +729,8 @@
         ctx.beginPath(); ctx.ellipse(nx, ny, 36*scale, 22*scale, Math.PI*0.1, 0, Math.PI*2); ctx.stroke();
       }
       // tiny impact sparkles on sim location
-      const vx0 = player.x - Math.floor(VIEW_W/2), vy0 = player.y - Math.floor(VIEW_H/2);
-      const sx = (sim.x - vx0) * TILE + TILE*0.5;
-      const sy = (sim.y - vy0) * TILE + TILE*0.5;
+      const sx = (sim.x - camX + VIEW_W/2) * TILE + TILE*0.0;
+      const sy = (sim.y - camY + VIEW_H/2) * TILE + TILE*0.0;
       ctx.globalAlpha = 0.9 * (1 - t);
       for(let i=0;i<6;i++){
         ctx.fillStyle = ['#ffd166','#66ccff','#a56cff'][i%3];
@@ -843,16 +865,15 @@
     function frame(now){
       const t = (now - start)/dur;
       draw(); // redraw static scene or battle background
-      // draw overlay sprites for shake effect
+      // draw overlay sprites for shake effect (subtle, we keep simple)
       ctx.save();
       const offset = Math.sin(t*30) * 8 * (1 - t);
-      // draw enemy/player label area offsets to simulate shake - simple representation
-      if(target === 'enemy'){
-        // enemy sprite area (top-right in battle panel)
-        const panelX = (cvs.width - 420)/2 + 260, panelY = 120; // approximate positions (we keep it abstract)
-        ctx.translate(offset, 0);
-      } else {
-        ctx.translate(-offset, 0);
+      if(t < 1){
+        if(target === 'enemy'){
+          ctx.translate(offset, 0);
+        } else {
+          ctx.translate(-offset, 0);
+        }
       }
       ctx.restore();
       if(t < 1) requestAnimationFrame(frame);
@@ -883,50 +904,31 @@
   // ----- Helpers -----
   function isTouch(){ return /Mobi|Android|iPhone|iPad|iPod|Tablet/i.test(navigator.userAgent); }
 
-  // If we start in world (from saved), show controls appropriately
-  if(mode==='world' && isTouch()) document.getElementById('dpad').style.display = 'grid';
-
-  // Expose a utility to place images by clicking button (already done via file inputs)
-  // Save when "Remember Me" is checked on sign-in
-  document.getElementById('rememberMe').addEventListener('change', (e)=>{
-    if(!e.target.checked) return; // only saves when checked
-  });
-
-  // When clicking on the canvas, attempt to interact with tile under center or clicked tile by mapping click
+  // When clicking on the canvas, attempt to interact with tile under clicked tile
   cvs.addEventListener('click', (ev)=>{
-    // compute clicked tile in viewport coordinates
+    // compute clicked tile in viewport coordinates using fractional camera
     const rect = cvs.getBoundingClientRect();
     const cx = ev.clientX - rect.left;
     const cy = ev.clientY - rect.top;
-    // tile coords relative to viewport
-    const tx = Math.floor(cx / TILE);
-    const ty = Math.floor(cy / TILE);
-    // world coords
-    const vx0 = player.x - Math.floor(VIEW_W/2);
-    const vy0 = player.y - Math.floor(VIEW_H/2);
-    const wx = vx0 + tx, wy = vy0 + ty;
-    // if clicked tile equals NPC or sim and player is on top of it? The user asked: "when i go on top of the simitaur" — it's already triggered on movement.
-    // But allow clicking to move to tile (walk) in case user wants to click target
-    // compute step path of one tile towards clicked tile (simple)
+    // convert pixel to world tile (inverse of draw)
+    const worldTileX = camX - VIEW_W/2 + (cx / TILE);
+    const worldTileY = camY - VIEW_H/2 + (cy / TILE);
+    const wx = Math.floor(worldTileX), wy = Math.floor(worldTileY);
+    // compute step of one tile toward clicked tile
     const dx = Math.sign(wx - player.x), dy = Math.sign(wy - player.y);
     if(Math.abs(wx - player.x) + Math.abs(wy - player.y) > 0){
-      // Move one step towards clicked tile
       move(dx, dy);
     }
   });
 
-  // When finished interactions, optionally save
-  // Save whenever "Remember Me" checked after catches/wins etc.
-  // Add small autosave after key events:
-  function maybeSave(){ if(document.getElementById('rememberMe').checked) saveGame(); }
+  // small autosave helper
+  function maybeSave(){ if(document.getElementById('rememberMe')?.checked) saveGame(); }
 
-  // ----- Simple startup UI behavior -----
-  // Make Start show only when signed in (already handled toggle above).
+  // Expose a utility to spawn more sims if needed
+  window.Simitaur = { spawnSims, saveGame, loadGame, simdex, player, sims };
+
   // show sign-in panel initially
   panel('menu', true);
-
-  // ----- Small safeguard: expose a reload spawnSims button on dev console if needed -----
-  window.Simitaur = { spawnSims, saveGame, loadGame, simdex, player, sims };
 
   // Done!
 })();
@@ -934,5 +936,3 @@
 </body>
 </html>
 
-
-This is my game code 
