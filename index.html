@@ -6,7 +6,7 @@
 <title>Simitaur Adventure — Complete</title>
 <style>
   :root{
-    --bg:#0e1610; --panel:rgba(6,8,6,.88);
+    --bg:#0e1610; --panel:rgba(6,8,6,.92);
     --card:#16261a; --accent:#ffd166; --btn:#2f6e3a; --btn-h:#3f8e4d;
     --danger:#ff5b5b; --ink:#d8ffe5;
   }
@@ -26,7 +26,7 @@
     position:fixed;left:12px;bottom:12px;display:grid;
     grid-template-columns:56px 56px;grid-template-rows:56px 56px 56px;gap:8px;z-index:60
   }
-  #dpad button{width:56px;height:56px;border-radius:12px;border:none;background:#254b2d;color:white;font-weight:900;box-shadow:0 3px 0 #173221;font-size:20px}
+  #dpad button{width:56px;height:56px;border-radius:12px;border:none;background:#254b2d;color:white;font-weight:900;box-shadow:0 3px 0 #173221;font-size:20px;user-select:none}
   #dpad .ghost{opacity:.7}
   /* Panels / Modals */
   .panel{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:var(--panel);backdrop-filter:blur(3px);z-index:80}
@@ -74,7 +74,7 @@
 </head>
 <body>
 <div class="wrap">
-  <canvas id="game" width="640" height="512"></canvas>
+  <canvas id="game" width="640" height="640"></canvas>
 </div>
 
 <!-- HUD -->
@@ -95,7 +95,7 @@
 
 <!-- MENU / SIGNIN -->
 <div id="menu" class="panel show">
-  <div class="box" style="text-align:center;max-width:480px">
+  <div class="box" style="text-align:center;max-width:520px">
     <h1 style="margin:6px 0 2px">Simitaur Adventure</h1>
     <p class="muted" style="margin:0 0 10px">Explore, catch, and battle Simitaurs. Upload your own sprites in <b>Settings</b>.</p>
     <div id="signin-area">
@@ -112,13 +112,13 @@
       <button id="btnOpenSettings" class="btn">Settings</button>
       <button id="btnOpenDexPanel" class="btn">SimDex</button>
     </div>
-    <p class="note">Controls: <span class="kbd">Arrow Keys / WASD</span> or on-screen D-Pad • Click tiles by stepping onto them</p>
+    <p class="note">Controls: <span class="kbd">Arrow Keys / WASD</span> or on-screen D-Pad • Walk onto tiles to interact</p>
   </div>
 </div>
 
 <!-- Settings -->
 <div id="settings" class="panel">
-  <div class="box" style="min-width:320px;max-width:780px">
+  <div class="box" style="min-width:320px;max-width:820px">
     <h2 style="margin-top:0">Settings & Uploads</h2>
     <div id="settingsGrid">
       <label>Player Sprite<input id="filePlayer" type="file" accept="image/*"></label>
@@ -131,8 +131,12 @@
       <label>Sim Sprite Slot 5<input class="fileSim" data-id="4" type="file" accept="image/*"></label>
       <label>Sim Sprite Slot 6<input class="fileSim" data-id="5" type="file" accept="image/*"></label>
     </div>
-    <div class="row" style="justify-content:space-between;margin-top:12px">
-      <div class="note">Tip: Upload square-ish images for the best look. Your uploads stay in this session (and can be saved if “Remember Me” is checked).</div>
+    <div class="row" style="justify-content:space-between;margin-top:12px;align-items:center">
+      <div>
+        <label style="display:flex;gap:8px;align-items:center"><input id="toggleMusic" type="checkbox" checked> Music</label>
+        <label style="display:flex;gap:8px;align-items:center;margin-top:6px"><input id="toggleSfx" type="checkbox" checked> Sound Effects</label>
+        <div class="note" style="margin-top:6px">Tip: upload square-ish images. "Remember Me" will save your team & simdex.</div>
+      </div>
       <div><button id="btnCloseSettings" class="btn">Close</button></div>
     </div>
   </div>
@@ -190,36 +194,33 @@
 
 <script>
 /* ===========================================================
-   Simitaur Adventure — Full Self-Contained Game
-   - 100x100 map, renders 10x8 tiles (640x512 canvas)
-   - One-tile step movement (keys + D-pad)
-   - NPC "Charcoal" with dialogue + battle
-   - Wild Simitaurs with rarity sparkles + sizes/weights/attacks
-   - Turn-based battles; choose team member from SimDex
-   - Catch system with SimNet animation
-   - SimDex panel; click entries for info
-   - Settings: Upload your own sprites (Player, NPC, Net, up to 6 Sim slots)
-   - 8-bit music + SFX via Web Audio API
-   - Local save (Remember Me)
+   Simitaur Adventure — Full Integrated Game
+   Features implemented per user's request.
+   Single-file game, no external assets required.
    =========================================================== */
 
 (() => {
-  /* ---------- Canvas & View ---------- */
+  // ----- Canvas & world settings -----
   const cvs = document.getElementById('game'), ctx = cvs.getContext('2d');
-  const TILE = 64;                // tile pixel size on canvas
-  const VIEW_W = 10, VIEW_H = 8;  // tiles visible at once (canvas is 640x512)
+  // make map square: 10x10 tiles for 640x640 canvas => TILE=64
+  const TILE = 64, VIEW_W = 10, VIEW_H = 10;
   const MAP_W = 100, MAP_H = 100;
 
-  // State
-  let mode = 'menu'; // menu, world, battle
-  let player = {
+  // ----- State -----
+  let mode = 'menu'; // menu, world, battle, etc.
+  const player = {
     x: Math.floor(MAP_W/2), y: Math.floor(MAP_H/2),
-    hp: 100, maxHp: 100, img: null, sims: [], xp:0, name:'', pass:''
+    hp:100, maxHp:100, img: null, sims: [], xp:0, name:'', pass:''
   };
-  // Place NPC near center
-  let npc = { x: Math.floor(MAP_W/2)+3, y: Math.floor(MAP_H/2), img: null };
+  const npc = { x: Math.floor(MAP_W/2) + 3, y: Math.floor(MAP_H/2), img: null, name: 'Charcoal' };
+  let netImage = null;
+  let sims = [];            // wild sims positions
+  let simdex = {};          // caught index
+  let currentEncounter = null; // 'npc' or sim object
+  let battlePlayerSim = null, battleEnemySim = null;
+  let musicOn = true, sfxOn = true;
 
-  // Sim Types — you can replace icons via Settings
+  // ----- Types -----
   const types = [
     { id:0, name:'Frostaur', img:null, src:'', baseRarityWeights:[60,25,10,3,1,1] },
     { id:1, name:'Rockaur',  img:null, src:'', baseRarityWeights:[40,30,18,8,3,1] },
@@ -228,148 +229,106 @@
     { id:4, name:'Flametaur',img:null, src:'', baseRarityWeights:[42,30,16,8,3,1] },
     { id:5, name:'Aquataur', img:null, src:'', baseRarityWeights:[34,30,20,10,5,1] }
   ];
+  const RARITIES = ['Common','Uncommon','Rare','Legendary','Mythic','Exotic'];
 
-  let sims = [];           // wild creatures on map
-  let simdex = {};         // caught index
-  let currentEncounter = null; // 'npc' or sim object
-  let battlePlayerSim = null, battleEnemySim = null;
-  let netImage = null;     // for catch animation
-
-  /* ---------- Audio: Web Audio 8-bit Music & SFX ---------- */
+  // ----- Audio -----
   const AC = window.AudioContext || window.webkitAudioContext;
   const audio = new AC();
-  let musicOn = true, sfxOn = true, musicToken = 0;
-
+  let musicToken = 0;
   function ensureAudio(){ if(audio.state === 'suspended') audio.resume(); }
 
-  // Simple oscillator tone
-  function tone(freq, dur=0.14, type='square', vol=0.05){
+  function tone(freq, dur=0.12, type='square', vol=0.06){
     if(!sfxOn) return;
     const t0 = audio.currentTime;
     const o = audio.createOscillator(), g = audio.createGain();
     o.type = type; o.frequency.value = freq; g.gain.value = vol;
     o.connect(g); g.connect(audio.destination);
     o.start(t0);
-    // quick envelope to avoid clicks
-    const a = 0.005, r = 0.03;
+    const a=0.004, r=0.03;
     g.gain.setValueAtTime(0, t0);
-    g.gain.linearRampToValueAtTime(vol, t0 + a);
-    g.gain.linearRampToValueAtTime(0.0001, t0 + dur - r);
-    o.stop(t0 + dur);
+    g.gain.linearRampToValueAtTime(vol, t0+a);
+    g.gain.linearRampToValueAtTime(0.0001, t0+dur-r);
+    o.stop(t0+dur);
   }
+  const sfx = {
+    step(){ tone(220+Math.random()*20, .06, 'triangle', .04); },
+    atk(){ tone(740, .09, 'square', .07); tone(620, .06, 'square', .06); },
+    battleStart(){ tone(330,.08,'square',.07); setTimeout(()=>tone(660,.12,'square',.07),80); },
+    catch(){ tone(520,.18,'square',.07); setTimeout(()=>tone(880,.12,'square',.06),140); },
+    win(){ tone(880,.14,'sawtooth',.08); setTimeout(()=>tone(660,.12,'square',.05),120); },
+    escape(){ tone(180,.12,'triangle',.05); }
+  };
 
-  // SFX set
-  function sfxStep(){ tone(220 + Math.random()*20, .06, 'triangle', .05); }
-  function sfxAtk(){ tone(740, .1, 'square', .07); tone(620, .07, 'square', .06); }
-  function sfxBattleStart(){ tone(330,.08,'square',.07); setTimeout(()=>tone(660,.12,'square',.07),80); }
-  function sfxCatch(){ tone(520, .22, 'square', .08); setTimeout(()=>tone(880,.12,'square',.06),140); }
-  function sfxWin(){ tone(880, .14, 'sawtooth', .07); setTimeout(()=>tone(660,.14,'square',.05),120); }
-  function sfxEscape(){ tone(180, .12,'triangle', .05); }
-
-  // Background chiptune melody (procedural)
-  // Simple 8-bit loop: chord arps + bass
+  // simple procedural 8-bit music loop
   function startMusic(){
     if(!musicOn) return;
     ensureAudio();
     const token = ++musicToken;
-    const key = [196,220,247,262,294,330,349,392]; // G-ish pentatonic-ish
-    const tempo = 128; // bpm
-    const spb = 60/tempo; // seconds per beat
+    const key = [196,220,247,262,294,330,349,392];
+    const tempo = 110;
+    const spb = 60/tempo;
     let step = 0;
-
     (function loop(){
       if(!musicOn || token !== musicToken) return;
-
       const t0 = audio.currentTime + 0.02;
-      // Bass every 1/2 bar
-      const bassSeq = [98, 98, 110, 123, 98, 98, 130, 147]; // supportive
-      const bass = bassSeq[step % bassSeq.length];
-      scheduleBass(bass, t0, spb);
-
-      // Melody arpeggio
+      const bassSeq = [98,98,110,123,98,110,130,147];
+      scheduleBass(bassSeq[step % bassSeq.length], t0, spb);
       const chord = [
-        [ key[0], key[2], key[4] ],
-        [ key[1], key[3], key[5] ],
-        [ key[2], key[4], key[6] ],
-        [ key[3], key[5], key[7] ],
+        [key[0],key[2],key[4]],
+        [key[1],key[3],key[5]],
+        [key[2],key[4],key[6]],
+        [key[3],key[5],key[7]]
       ][(Math.floor(step/2))%4];
       scheduleArp(chord, t0, spb);
-
-      // Snare-ish click
       schedulePerc(t0+spb*0.5);
-      schedulePerc(t0+spb*1.5);
-
       step++;
-      setTimeout(loop, spb*1000*2); // schedule every 2 beats
+      setTimeout(loop, spb*1000*2);
     })();
   }
-
   function scheduleBass(freq, t0, spb){
     const o = audio.createOscillator(), g = audio.createGain();
-    o.type='square'; o.frequency.value = freq;
-    g.gain.value = 0.06;
+    o.type='square'; o.frequency.value=freq; g.gain.value=0.06;
     o.connect(g); g.connect(audio.destination);
-    const a=0.005, d=0.08, s=0.02, r=0.08;
-    g.gain.setValueAtTime(0, t0);
-    g.gain.linearRampToValueAtTime(0.08, t0+a);
-    g.gain.linearRampToValueAtTime(0.03, t0+d);
-    g.gain.setValueAtTime(0.03, t0+spb*1.8);
-    g.gain.linearRampToValueAtTime(0.0001, t0+spb*2-r);
-    o.start(t0);
-    o.stop(t0+spb*2);
+    const a=0.005, d=0.08, r=0.08;
+    g.gain.setValueAtTime(0,t0); g.gain.linearRampToValueAtTime(0.08,t0+a);
+    g.gain.linearRampToValueAtTime(0.03,t0+d);
+    g.gain.linearRampToValueAtTime(0.0001,t0+spb*2-r);
+    o.start(t0); o.stop(t0+spb*2);
   }
-
-  function scheduleArp(notes, t0, spb){
-    const times = [0, spb*0.5, spb*1.0, spb*1.5];
-    times.forEach((off,i)=>{
-      const o = audio.createOscillator(), g = audio.createGain();
-      o.type='triangle'; o.frequency.value = notes[i%notes.length];
-      g.gain.value = 0.05;
+  function scheduleArp(notes,t0,spb){
+    [0, spb*0.5, spb*1.0, spb*1.5].forEach((off,i)=>{
+      const o=audio.createOscillator(), g=audio.createGain();
+      o.type='triangle'; o.frequency.value = notes[i%notes.length]; g.gain.value=0.05;
       o.connect(g); g.connect(audio.destination);
-      const a=0.005, r=0.04;
-      g.gain.setValueAtTime(0, t0+off);
-      g.gain.linearRampToValueAtTime(0.06, t0+off+a);
-      g.gain.linearRampToValueAtTime(0.0001, t0+off+spb*0.45-r);
-      o.start(t0+off);
-      o.stop(t0+off+spb*0.5);
+      g.gain.setValueAtTime(0,t0+off); g.gain.linearRampToValueAtTime(0.06,t0+off+0.005);
+      g.gain.linearRampToValueAtTime(0.0001,t0+off+spb*0.45-0.03);
+      o.start(t0+off); o.stop(t0+off+spb*0.5);
     });
   }
-
   function schedulePerc(t){
     const n = audio.createBufferSource();
-    const len = 2200;
-    const buf = audio.createBuffer(1, len, audio.sampleRate);
-    const data = buf.getChannelData(0);
-    for(let i=0;i<len;i++){
-      data[i] = (Math.random()*2-1) * Math.pow(1-i/len,2); // noise with decay
-    }
+    const len=2200; const buf=audio.createBuffer(1,len,audio.sampleRate);
+    const d=buf.getChannelData(0);
+    for(let i=0;i<len;i++) d[i] = (Math.random()*2-1) * Math.pow(1-i/len,2);
     n.buffer = buf;
-    const g = audio.createGain();
-    g.gain.value = 0.06;
-    n.connect(g); g.connect(audio.destination);
+    const g = audio.createGain(); g.gain.value=0.06; n.connect(g); g.connect(audio.destination);
     n.start(t);
   }
 
-  // Music toggle logic
-  function toggleMusic(){
-    musicOn = !musicOn;
-    document.getElementById('btnMusic').textContent = 'Music: ' + (musicOn ? 'On' : 'Off');
-    if(musicOn){ startMusic(); } else { musicToken++; }
-  }
-
-  /* ---------- Save / Load ---------- */
-  const SAVE_KEY = 'simitaur_save_v2';
+  // ----- Save / Load -----
+  const SAVE_KEY = 'simitaur_save_v3';
   function saveGame(){
     try{
       const store = {
-        player:{
-          name: player.name, pass: player.pass,
+        player:{ name:player.name, pass:player.pass,
           sims: player.sims.map(s=>({
-            typeId:s.type.id, hp:s.hp, maxHp:s.maxHp, attacks:s.attacks,
-            rarity:s.rarity, size:s.size, weight:s.weight, src: s.type.src || ''
-          }))
-        },
-        simdex
+            typeId: s.type.id, hp:s.hp, maxHp:s.maxHp, attacks:s.attacks, rarity:s.rarity, size:s.size, weight:s.weight
+          })) },
+        simdex,
+        typesMeta: types.map(t => ({ id:t.id, src:t.src || '' })),
+        npcSrc: npc.img?.src || '',
+        playerSrc: player.img?.src || '',
+        netSrc: netImage?.src || ''
       };
       localStorage.setItem(SAVE_KEY, JSON.stringify(store));
     }catch(e){ console.warn('save failed', e); }
@@ -377,17 +336,28 @@
   function loadGame(){
     try{
       const raw = localStorage.getItem(SAVE_KEY); if(!raw) return false;
-      const obj = JSON.parse(raw); if(!obj?.player?.name) return false;
-      player.name = obj.player.name; player.pass = obj.player.pass || '';
-      player.sims = (obj.player.sims || []).map(d => ({
-        type: types.find(t=>t.id===d.typeId) || types[0],
-        hp:d.hp, maxHp:d.maxHp, attacks:d.attacks||[{name:'Punch',dmg:10}],
-        rarity:d.rarity, size:d.size, weight:d.weight
-      }));
-      simdex = obj.simdex || {};
-      return true;
+      const obj = JSON.parse(raw);
+      if(obj.player?.name){
+        player.name = obj.player.name; player.pass = obj.player.pass || '';
+        player.sims = (obj.player.sims||[]).map(d => ({
+          type: types.find(t=>t.id===d.typeId) || types[0],
+          hp:d.hp, maxHp:d.maxHp, attacks:d.attacks||[{name:'Punch',dmg:10}], rarity:d.rarity, size:d.size, weight:d.weight
+        }));
+        simdex = obj.simdex || {};
+        // restore uploaded images srcs if present
+        (obj.typesMeta||[]).forEach(m=>{
+          const t = types.find(x=>x.id===m.id); if(t && m.src){ t.src = m.src; const img = new Image(); img.src = m.src; t.img = img; }
+        });
+        if(obj.npcSrc){ npc.img = new Image(); npc.img.src = obj.npcSrc; }
+        if(obj.playerSrc){ player.img = new Image(); player.img.src = obj.playerSrc; }
+        if(obj.netSrc){ netImage = new Image(); netImage.src = obj.netSrc; }
+        return true;
+      }
     }catch(e){ console.warn('load fail', e); return false; }
+    return false;
   }
+
+  // restore saved data if exists
   if(loadGame()){
     document.getElementById('playerName').value = player.name;
     document.getElementById('menu-main').style.display = 'flex';
@@ -395,8 +365,7 @@
     document.getElementById('rememberMe').checked = true;
   }
 
-  /* ---------- Rarities ---------- */
-  const RARITIES = ['Common','Uncommon','Rare','Legendary','Mythic','Exotic'];
+  // ----- Utility: rarities -----
   function weightedRarity(weights){
     const sum = weights.reduce((a,b)=>a+b,0);
     let r = Math.random()*sum;
@@ -404,24 +373,24 @@
     return weights.length-1;
   }
 
-  /* ---------- World Generation ---------- */
-  // Basic grass with random flowers to add detail
+  // ----- World generation -----
+  // make simple flora set for detail
   const flora = new Set();
   for(let i=0;i<2200;i++){
     flora.add((Math.floor(Math.random()*MAP_W)<<16) + Math.floor(Math.random()*MAP_H));
   }
 
   function spawnSims(){
-    sims.length = 0;
+    sims = []; // reset
     for(let y=0;y<MAP_H;y++){
       for(let x=0;x<MAP_W;x++){
-        if(Math.random() < 0.02 && !(x===player.x && y===player.y) && !(x===npc.x && y===npc.y)){
+        if(Math.random() < 0.018 && !(x===player.x && y===player.y) && !(x===npc.x && y===npc.y)){
           const t = types[Math.floor(Math.random()*types.length)];
           const idx = weightedRarity(t.baseRarityWeights.slice());
           const rarity = RARITIES[idx];
           const hp = 24 + Math.floor(Math.random()*60);
-          const size = 1 + Math.floor(Math.random()*3);        // 1..3
-          const weight = 1 + Math.floor(Math.random()*5);      // 1..5
+          const size = 1 + Math.floor(Math.random()*3); // 1..3
+          const weight = 1 + Math.floor(Math.random()*5);
           const attacksPool = [
             {name:'Tackle',dmg:6+Math.floor(Math.random()*8)},
             {name:'Bite',dmg:6+Math.floor(Math.random()*10)},
@@ -437,31 +406,27 @@
   }
   spawnSims();
 
-  /* ---------- Drawing ---------- */
+  // ----- Drawing -----
   let sparklePhase = 0;
-
   function draw(){
-    // world background tiles
+    // center player; compute viewport top-left
     const vx0 = player.x - Math.floor(VIEW_W/2);
     const vy0 = player.y - Math.floor(VIEW_H/2);
 
-    for(let y=0;y<VIEW_H;y++){
-      for(let x=0;x<VIEW_W;x++){
-        const gx = vx0 + x;
-        const gy = vy0 + y;
-        // base grass
-        ctx.fillStyle = ((x+y)&1) ? '#88d892' : '#7bd083';
-        ctx.fillRect(x*TILE, y*TILE, TILE, TILE);
-
-        // flowers / detail
-        const key = (gx<<16) + gy;
-        if(flora.has(key)){
-          const fx = x*TILE + 8 + (gx*13+gy*7)%40;
-          const fy = y*TILE + 8 + (gx*5+gy*11)%40;
-          ctx.fillStyle = '#e4ffd9';
-          ctx.fillRect(fx,fy,4,4);
+    // draw tiles (green checkered)
+    for(let ty=0; ty<VIEW_H; ty++){
+      for(let tx=0; tx<VIEW_W; tx++){
+        const gx = vx0 + tx, gy = vy0 + ty;
+        // checker greens
+        ctx.fillStyle = ((gx+gy)&1) ? '#7cc57a' : '#67b86a';
+        ctx.fillRect(tx*TILE, ty*TILE, TILE, TILE);
+        // flowers detail
+        const k = (gx<<16) + gy;
+        if(flora.has(k) && Math.random() < 0.12){
+          ctx.fillStyle = '#eafde8';
+          ctx.fillRect(tx*TILE+6, ty*TILE+8, 3, 3);
           ctx.fillStyle = '#ff6b6b';
-          ctx.fillRect(fx+6,fy+2,3,3);
+          ctx.fillRect(tx*TILE+10, ty*TILE+12, 3, 3);
         }
       }
     }
@@ -471,30 +436,26 @@
     if(nx>=0 && nx<VIEW_W && ny>=0 && ny<VIEW_H){
       if(npc.img) ctx.drawImage(npc.img, nx*TILE, ny*TILE, TILE, TILE);
       else { ctx.fillStyle='#f4a261'; ctx.fillRect(nx*TILE, ny*TILE, TILE, TILE); }
-      // name tag
-      ctx.fillStyle='rgba(0,0,0,.33)';
-      ctx.fillRect(nx*TILE, ny*TILE-18, TILE, 18);
-      ctx.fillStyle='#ffd166';
-      ctx.font='12px monospace';
-      ctx.fillText('Charcoal', nx*TILE+6, ny*TILE-6);
+      // name tag above
+      ctx.fillStyle='rgba(0,0,0,0.45)'; ctx.fillRect(nx*TILE, ny*TILE-18, TILE, 18);
+      ctx.fillStyle='#ffd166'; ctx.font='12px monospace'; ctx.fillText(npc.name, nx*TILE+6, ny*TILE-6);
     }
 
-    // Sims
-    sims.forEach(s=>{
+    // sims
+    sims.forEach(s => {
       const sx = s.x - vx0, sy = s.y - vy0;
       if(sx>=0 && sx<VIEW_W && sy>=0 && sy<VIEW_H){
         if(s.type.img) ctx.drawImage(s.type.img, sx*TILE, sy*TILE, TILE, TILE);
         else {
           const cols=['#ff595e','#8ac926','#1982c4','#ffd166','#6c5ce7','#00cec9'];
-          ctx.fillStyle=cols[s.type.id%cols.length];
+          ctx.fillStyle = cols[s.type.id % cols.length];
           ctx.fillRect(sx*TILE, sy*TILE, TILE, TILE);
         }
-        // rarity effects (sparkles/borders)
         drawRarityFX(s, sx, sy);
       }
     });
 
-    // player center
+    // player centered
     const px = Math.floor(VIEW_W/2)*TILE, py = Math.floor(VIEW_H/2)*TILE;
     if(player.img) ctx.drawImage(player.img, px, py, TILE, TILE);
     else { ctx.fillStyle='#1d3557'; ctx.fillRect(px, py, TILE, TILE); }
@@ -506,53 +467,27 @@
     const x = sx*TILE, y = sy*TILE;
     ctx.save();
     const p = sparklePhase + s.x*0.5 + s.y*0.3;
-
-    function sparkle(color, count=2){
+    const sparkle = (color, count=2) => {
       for(let i=0;i<count;i++){
-        const t = (p*1.6 + i*1.7)%1;
-        const ox = Math.floor((Math.sin(p*3+i*2)*0.5+0.5)*(TILE-12))+6;
-        const oy = Math.floor((Math.cos(p*2+i*3)*0.5+0.5)*(TILE-12))+6;
-        ctx.fillStyle = color;
-        ctx.globalAlpha = 0.6 + 0.4*Math.sin(p*4+i);
-        ctx.fillRect(x+ox, y+oy, 4, 4);
+        const ox = Math.floor((Math.sin(p*3 + i*1.7)*0.5+0.5)*(TILE-18))+8;
+        const oy = Math.floor((Math.cos(p*2 + i*2.3)*0.5+0.5)*(TILE-18))+8;
+        ctx.fillStyle = color; ctx.globalAlpha = 0.6 + 0.4*Math.sin(p*4+i);
+        ctx.fillRect(x+ox, y+oy, 5, 5);
       }
       ctx.globalAlpha = 1;
-    }
-
+    };
     switch(s.rarity){
-      case 'Common':         // blue sparkles
-        sparkle('#53a9ff', 2);
-        ctx.strokeStyle = 'rgba(120,180,255,0.4)'; ctx.lineWidth=2; ctx.strokeRect(x+2,y+2,TILE-4,TILE-4);
-        break;
-      case 'Uncommon':       // grey sparkles
-        sparkle('#a0a7ad', 3);
-        ctx.strokeStyle = '#a0a7ad'; ctx.lineWidth=2; ctx.strokeRect(x+2,y+2,TILE-4,TILE-4);
-        break;
-      case 'Rare':           // purple sparkles
-        sparkle('#a56cff', 3);
-        ctx.strokeStyle = '#a56cff'; ctx.lineWidth=3; ctx.strokeRect(x+2,y+2,TILE-4,TILE-4);
-        break;
-      case 'Legendary':      // gold shimmer border pulse
-        sparkle('#ffd166', 3);
-        const alpha=0.45 + Math.abs(Math.sin(p))*0.5;
-        ctx.strokeStyle=`rgba(255,215,0,${alpha})`; ctx.lineWidth=3; ctx.strokeRect(x+2, y+2, TILE-4, TILE-4);
-        break;
-      case 'Mythic':         // blue + purple
-        sparkle('#66ccff', 2);
-        sparkle('#b388ff', 2);
-        ctx.strokeStyle='rebeccapurple'; ctx.lineWidth=3; ctx.strokeRect(x+2, y+2, TILE-4, TILE-4);
-        break;
-      case 'Exotic':         // RGB rainbow border
-        const colors=['#ff0000','#ff7f00','#ffff00','#00ff00','#0000ff','#4b0082','#8f00ff'];
-        const c = colors[Math.floor((p*10)%colors.length)];
-        sparkle(c, 4);
-        ctx.strokeStyle=c; ctx.lineWidth=4; ctx.strokeRect(x+2,y+2,TILE-4,TILE-4);
-        break;
+      case 'Common': sparkle('#53a9ff',2); ctx.strokeStyle='rgba(120,180,255,0.35)'; ctx.lineWidth=2; ctx.strokeRect(x+3,y+3,TILE-6,TILE-6); break;
+      case 'Uncommon': sparkle('#a0a7ad',3); ctx.strokeStyle='#a0a7ad'; ctx.lineWidth=2; ctx.strokeRect(x+3,y+3,TILE-6,TILE-6); break;
+      case 'Rare': sparkle('#a56cff',3); ctx.strokeStyle='#a56cff'; ctx.lineWidth=3; ctx.strokeRect(x+2,y+2,TILE-4,TILE-4); break;
+      case 'Legendary': sparkle('#ffd166',3); ctx.strokeStyle=`rgba(255,215,0,${0.4 + Math.abs(Math.sin(p))*0.5})`; ctx.lineWidth=3; ctx.strokeRect(x+2,y+2,TILE-4,TILE-4); break;
+      case 'Mythic': sparkle('#66ccff',2); sparkle('#b388ff',2); ctx.strokeStyle='rebeccapurple'; ctx.lineWidth=3; ctx.strokeRect(x+2,y+2,TILE-4,TILE-4); break;
+      case 'Exotic': const colors=['#ff0000','#ff7f00','#ffff00','#00ff00','#0000ff','#4b0082','#8f00ff']; const c = colors[Math.floor((p*10)%colors.length)]; sparkle(c,4); ctx.strokeStyle=c; ctx.lineWidth=4; ctx.strokeRect(x+2,y+2,TILE-4,TILE-4); break;
     }
     ctx.restore();
   }
 
-  /* ---------- Movement ---------- */
+  // ----- Movement and input -----
   function move(dx,dy){
     if(mode !== 'world') return;
     ensureAudio();
@@ -560,27 +495,24 @@
     const ny = Math.max(0, Math.min(MAP_H-1, player.y + dy));
     if(nx === player.x && ny === player.y) return;
     player.x = nx; player.y = ny;
-    sfxStep();
+    sfx.step();
     checkTileInteraction();
     draw();
   }
 
-  // D-pad wiring + hold repeat
+  // make D-pad interactive with hold repeat
   function wirePad(id,dx,dy){
     const el = document.getElementById(id);
-    let interval;
-    const down = (e)=>{ e?.preventDefault(); move(dx,dy); interval = setInterval(()=>move(dx,dy), 150); };
-    const up   = ()=>{ clearInterval(interval); };
-    el.addEventListener('mousedown', down);
-    el.addEventListener('mouseup', up);
-    el.addEventListener('mouseleave', up);
-    el.addEventListener('touchstart', e=>{ down(e); }, {passive:false});
-    el.addEventListener('touchend', up);
-    el.addEventListener('click', e=>{ e.preventDefault(); }); // prevent double
+    let intv;
+    const down = (e)=>{ e?.preventDefault(); move(dx,dy); intv = setInterval(()=>move(dx,dy), 160); };
+    const up = ()=>{ clearInterval(intv); };
+    el.addEventListener('mousedown', down); el.addEventListener('touchstart', down, {passive:false});
+    el.addEventListener('mouseup', up); el.addEventListener('touchend', up);
+    el.addEventListener('mouseleave', up); el.addEventListener('click', e=>e.preventDefault());
   }
   wirePad('padUp',0,-1); wirePad('padDown',0,1); wirePad('padLeft',-1,0); wirePad('padRight',1,0);
 
-  // Keyboard
+  // keyboard
   window.addEventListener('keydown', e=>{
     if(mode !== 'world') return;
     const k = e.key.toLowerCase();
@@ -590,8 +522,14 @@
     if(k==='arrowright'||k==='d') move(1,0);
   });
 
-  /* ---------- UI Wiring: Menu / Signin ---------- */
-  document.getElementById('btnSignIn').addEventListener('click', ()=>{
+  // ----- UI wiring: sign in, menu, settings -----
+  function panel(id, show){
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('show'));
+    if(show) document.getElementById(id).classList.add('show');
+  }
+  function wire(id, fn){ const el=document.getElementById(id); el.addEventListener('click', fn); el.addEventListener('touchstart', e=>{ e.preventDefault(); fn(); }, {passive:false}); }
+
+  wire('btnSignIn', ()=>{
     const n = document.getElementById('playerName').value.trim();
     const p = document.getElementById('playerPass').value;
     if(!n || !p) return alert('Enter name and password');
@@ -600,25 +538,25 @@
     document.getElementById('signin-area').style.display = 'none';
     document.getElementById('menu-main').style.display = 'flex';
   });
-  document.getElementById('btnGuest').addEventListener('click', ()=>{
-    player.name = 'Guest';
-    document.getElementById('signin-area').style.display = 'none';
-    document.getElementById('menu-main').style.display = 'flex';
+  wire('btnGuest', ()=>{
+    player.name = 'Guest'; document.getElementById('signin-area').style.display = 'none'; document.getElementById('menu-main').style.display = 'flex';
   });
-  document.getElementById('btnStart').addEventListener('click', ()=>{
+
+  wire('btnStart', ()=>{
     mode = 'world';
     panel('menu', false);
     document.getElementById('hud').style.display = 'flex';
     document.getElementById('dpad').style.display = isTouch() ? 'grid' : 'none';
     draw();
-    startMusic();
+    if(musicOn) startMusic();
   });
-  document.getElementById('btnSignOut').addEventListener('click', ()=>{
+
+  wire('btnSignOut', ()=>{
     localStorage.removeItem(SAVE_KEY);
     location.reload();
   });
 
-  /* ---------- Settings uploads ---------- */
+  // settings uploads
   function loadImgFromInput(el, cb){
     const f = el.files?.[0]; if(!f) return;
     const url = URL.createObjectURL(f);
@@ -626,20 +564,23 @@
     img.onload = ()=>{ cb(img, url); draw(); };
     img.src = url;
   }
-  document.getElementById('filePlayer').addEventListener('change', e=> loadImgFromInput(e.target, (img)=> player.img = img ));
-  document.getElementById('fileNPC').addEventListener('change', e=> loadImgFromInput(e.target, (img)=> npc.img = img ));
-  document.getElementById('fileNet').addEventListener('change', e=> loadImgFromInput(e.target, (img)=> netImage = img ));
+  document.getElementById('filePlayer').addEventListener('change', e=> loadImgFromInput(e.target, (img,url)=>{ player.img = img; if(document.getElementById('rememberMe').checked) saveGame(); }));
+  document.getElementById('fileNPC').addEventListener('change', e=> loadImgFromInput(e.target, (img,url)=>{ npc.img = img; if(document.getElementById('rememberMe').checked) saveGame(); }));
+  document.getElementById('fileNet').addEventListener('change', e=> loadImgFromInput(e.target, (img,url)=>{ netImage = img; if(document.getElementById('rememberMe').checked) saveGame(); }));
   document.querySelectorAll('.fileSim').forEach(inp=>{
     inp.addEventListener('change', e=>{
       const id = Number(inp.dataset.id);
-      loadImgFromInput(e.target, (img,url)=>{ types[id].img = img; types[id].src = url; draw(); });
+      loadImgFromInput(e.target, (img,url)=>{ types[id].img = img; types[id].src = url; if(document.getElementById('rememberMe').checked) saveGame(); draw(); });
     });
   });
-  document.getElementById('btnOpenSettings').addEventListener('click', ()=>panel('settings', true));
-  document.getElementById('btnCloseSettings').addEventListener('click', ()=>panel('settings', false));
-  document.getElementById('btnSettings').addEventListener('click', ()=>panel('settings', true));
 
-  /* ---------- SimDex ---------- */
+  wire('btnOpenSettings', ()=>panel('settings', true));
+  wire('btnCloseSettings', ()=>panel('settings', false));
+  wire('btnSettings', ()=>panel('settings', true));
+  document.getElementById('toggleMusic').addEventListener('change', e=>{ musicOn = e.target.checked; document.getElementById('btnMusic').textContent = 'Music: ' + (musicOn ? 'On' : 'Off'); if(musicOn) startMusic(); else musicToken++; });
+  document.getElementById('toggleSfx').addEventListener('change', e=> sfxOn = e.target.checked);
+
+  // ----- SimDex ----- 
   function buildDex(){
     const grid = document.getElementById('dexGrid'); grid.innerHTML = '';
     const keys = Object.keys(simdex);
@@ -654,26 +595,30 @@
       grid.appendChild(el);
     });
   }
-  document.getElementById('btnOpenDexPanel').addEventListener('click', ()=>{ buildDex(); panel('dex', true); });
-  document.getElementById('btnCloseDex').addEventListener('click', ()=>panel('dex', false));
-  document.getElementById('btnDex').addEventListener('click', ()=>{ buildDex(); panel('dex', true); });
+  wire('btnOpenDexPanel', ()=>{ buildDex(); panel('dex', true); });
+  wire('btnCloseDex', ()=>panel('dex', false));
+  wire('btnDex', ()=>{ buildDex(); panel('dex', true); });
 
-  /* ---------- Music toggle ---------- */
-  document.getElementById('btnMusic').addEventListener('click', toggleMusic);
+  // music toggle button in hud
+  wire('btnMusic', ()=>{
+    musicOn = !musicOn; document.getElementById('btnMusic').textContent = 'Music: ' + (musicOn ? 'On' : 'Off');
+    if(musicOn) startMusic(); else musicToken++;
+    document.getElementById('toggleMusic').checked = musicOn;
+  });
 
-  /* ---------- Encounters ---------- */
+  // ----- Encounters ----- 
   function checkTileInteraction(){
     // NPC
     if(player.x === npc.x && player.y === npc.y){
       currentEncounter = 'npc';
       panel('encounterPanel', true);
-      document.getElementById('encounterTitle').textContent = 'Charcoal: Talk or Battle?';
+      document.getElementById('encounterTitle').textContent = `${npc.name}: Talk or Battle?`;
       document.getElementById('btnTalk').style.display = 'inline-block';
       document.getElementById('btnFight').style.display = 'inline-block';
       document.getElementById('btnCatchSim').style.display = 'none';
       return;
     }
-    // Wild
+    // Wild Sim
     const wild = sims.find(s => s.x === player.x && s.y === player.y);
     if(wild){
       currentEncounter = wild;
@@ -687,17 +632,16 @@
     currentEncounter = null;
   }
 
-  // Encounter buttons
-  wire('btnRun', ()=>{ currentEncounter = null; panel('encounterPanel', false); sfxEscape(); });
+  wire('btnRun', ()=>{ currentEncounter = null; panel('encounterPanel', false); sfx.escape(); });
   wire('btnTalk', ()=>{
     if(currentEncounter === 'npc'){
-      alert('Charcoal: Welcome! Catch Simitaurs and train them — some are incredibly rare! You can even upload your own sprites in Settings. Want to test your strength?');
+      alert(`${npc.name}: "Simitaurs are amazing — some hide in plain sight. Catch them, train them, and bring them along. Try uploading your own sprites in Settings!"`);
       panel('encounterPanel', false);
       currentEncounter = null;
     }
   });
 
-  // Fight opens choose panel first
+  // Fight: open choose panel to pick your sim to battle with
   wire('btnFight', ()=>{
     panel('encounterPanel', false);
     openChooseSim((chosen)=>{
@@ -712,7 +656,7 @@
     });
   });
 
-  // Catch
+  // Catch button: will perform swoop animation + capture chance
   wire('btnCatchSim', ()=>{
     if(currentEncounter && currentEncounter !== 'npc') runCatchSequence(currentEncounter);
   });
@@ -727,11 +671,11 @@
     return { type:t, hp, maxHp:hp, attacks, rarity:'Rare', size:2, weight:3 };
   }
 
-  /* ---------- Catch animation & logic ---------- */
+  // ----- Catch animation & logic (swoop) -----
   function captureChanceByRarity(r){
     switch(r){
-      case 'Common': return 70;
-      case 'Uncommon': return 55;
+      case 'Common': return 78;
+      case 'Uncommon': return 58;
       case 'Rare': return 38;
       case 'Legendary': return 20;
       case 'Mythic': return 12;
@@ -742,48 +686,70 @@
 
   function runCatchSequence(sim){
     panel('encounterPanel', false);
-    const dur = 800; const start = performance.now(); const cx = cvs.width/2, cy = cvs.height/2;
-
+    // swooping net animation toward center (where player is)
+    const dur = 900; const start = performance.now();
+    const cx = cvs.width/2, cy = cvs.height/2;
+    // remove sim from map visually only after successful capture or escape? We'll keep until capture success remove
     function anim(now){
       const t = Math.min(1,(now-start)/dur);
       draw();
-
       ctx.save();
-      const sy = cy - 40 * Math.sin(t*Math.PI);
-      const sx = cx;
+      // draw a swooping net from top-left to center
+      ctx.globalAlpha = 0.9;
+      const nx = lerp(-120, cx, easeOutQuad(t));
+      const ny = lerp(-120, cy-40, easeInOutCubic(t));
+      const scale = 0.6 + 1.3*t;
       if(netImage){
-        const s = 1 + 1.2*t;
-        ctx.drawImage(netImage, sx-48*s, sy-48*s, 96*s, 96*s);
+        ctx.drawImage(netImage, nx - 48*scale, ny - 48*scale, 96*scale, 96*scale);
       } else {
-        ctx.strokeStyle='white'; ctx.lineWidth=3; ctx.beginPath();
-        ctx.arc(sx, sy, 36 + 30*t, Math.PI*0.2, Math.PI*0.8); ctx.stroke();
+        ctx.strokeStyle='#fff'; ctx.lineWidth=4;
+        ctx.beginPath(); ctx.ellipse(nx, ny, 36*scale, 22*scale, Math.PI*0.1, 0, Math.PI*2); ctx.stroke();
+      }
+      // tiny impact sparkles on sim location
+      const vx0 = player.x - Math.floor(VIEW_W/2), vy0 = player.y - Math.floor(VIEW_H/2);
+      const sx = (sim.x - vx0) * TILE + TILE*0.5;
+      const sy = (sim.y - vy0) * TILE + TILE*0.5;
+      ctx.globalAlpha = 0.9 * (1 - t);
+      for(let i=0;i<6;i++){
+        ctx.fillStyle = ['#ffd166','#66ccff','#a56cff'][i%3];
+        const ox = Math.sin(i + t*6)*10*(1-t);
+        const oy = Math.cos(i*1.3 + t*5)*8*(1-t);
+        ctx.fillRect(sx+ox, sy+oy, 4,4);
       }
       ctx.restore();
-
-      if(t<1) requestAnimationFrame(anim);
-      else {
-        sfxCatch();
-        const chance = captureChanceByRarity(sim.rarity);
-        if(Math.random()*100 < chance){
-          const id = sim.type.name + '-' + Date.now();
-          simdex[id] = { name: sim.type.name, rarity: sim.rarity, hp: sim.hp, size: sim.size, weight: sim.weight, src: sim.type.src || '' };
-          const idx = sims.indexOf(sim); if(idx>=0) sims.splice(idx,1);
-          player.sims.push({ type: sim.type, hp: sim.hp, maxHp: sim.maxHp, attacks: sim.attacks, rarity: sim.rarity, size: sim.size, weight: sim.weight });
-          player.xp = (player.xp||0)+10;
-          if(document.getElementById('rememberMe').checked) saveGame();
-          buildDex();
-          alert(`Caught ${sim.type.name} (${sim.rarity})!`);
-        } else alert(`${sim.type.name} escaped!`);
-      }
+      if(t < 1) requestAnimationFrame(anim);
+      else finishCatch();
     }
     requestAnimationFrame(anim);
+
+    function finishCatch(){
+      sfx.catch();
+      const chance = captureChanceByRarity(sim.rarity);
+      if(Math.random()*100 < chance){
+        const id = sim.type.name + '-' + Date.now();
+        simdex[id] = { name: sim.type.name, rarity: sim.rarity, hp: sim.hp, size: sim.size, weight: sim.weight, src: sim.type.src || '' };
+        const idx = sims.indexOf(sim); if(idx>=0) sims.splice(idx,1);
+        player.sims.push({ type: sim.type, hp: sim.hp, maxHp: sim.maxHp, attacks: sim.attacks, rarity: sim.rarity, size: sim.size, weight: sim.weight });
+        if(document.getElementById('rememberMe').checked) saveGame();
+        buildDex();
+        alert(`Caught ${sim.type.name} (${sim.rarity})!`);
+      } else {
+        alert(`${sim.type.name} escaped!`);
+      }
+      currentEncounter = null;
+    }
   }
 
-  /* ---------- Battle System ---------- */
+  // easing helpers
+  function lerp(a,b,t){ return a + (b-a)*t; }
+  function easeOutQuad(t){ return t*(2-t); }
+  function easeInOutCubic(t){ return t<0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2; }
+
+  // ----- Battle System (with shake animation) -----
   function startBattleWithChosen(playerSim, enemySource){
-    battleEnemySim = { ...enemySource, hp: enemySource.hp, maxHp: enemySource.maxHp, attacks: enemySource.attacks ? enemySource.attacks.slice() : (enemySource.attacks || []) };
-    if(!playerSim){ // ensure at least one
-      if(player.sims.length===0){
+    battleEnemySim = { ...enemySource, hp: enemySource.hp, maxHp: enemySource.maxHp, attacks: (enemySource.attacks||[]).slice() };
+    if(!playerSim){
+      if(player.sims.length === 0){
         player.sims.push({ type: types[0], hp:40, maxHp:40, attacks:[{name:'Punch',dmg:10}], rarity:'Common', size:1, weight:1 });
       }
       playerSim = player.sims[0];
@@ -792,7 +758,7 @@
     panel('battlePanel', true);
     populateBattleUI();
     mode = 'battle';
-    sfxBattleStart();
+    sfx.battleStart();
   }
 
   function populateBattleUI(){
@@ -807,7 +773,7 @@
       b.addEventListener('touchstart', e=>{ e.preventDefault(); playerUseAttack(a); });
       div.appendChild(b);
     });
-    document.getElementById('btnRunBattle').onclick = ()=>{ panel('battlePanel', false); mode = 'world'; battleEnemySim = null; battlePlayerSim = null; sfxEscape(); };
+    document.getElementById('btnRunBattle').onclick = ()=>{ panel('battlePanel', false); mode='world'; battleEnemySim=null; battlePlayerSim=null; sfx.escape(); };
   }
 
   function updateHPbars(){
@@ -816,30 +782,35 @@
   }
 
   function playerUseAttack(a){
-    if(!battleEnemySim||!battlePlayerSim) return;
-    ensureAudio(); sfxAtk();
-    const base = a.dmg || (8+Math.floor(Math.random()*6));
+    if(!battleEnemySim || !battlePlayerSim) return;
+    ensureAudio(); sfx.atk();
+    const base = a.dmg || (8 + Math.floor(Math.random()*6));
     const dmg = Math.max(1, base + Math.floor((Math.random()-0.5)*4));
-    battleEnemySim.hp = Math.max(0, battleEnemySim.hp - dmg);
-    updateHPbars();
-    if(battleEnemySim.hp<=0){ setTimeout(()=>{ sfxWin(); onBattleWin(); }, 220); return; }
-    setTimeout(()=> enemyTurn(), 420);
+    // shake enemy sprite with simple overlay animation
+    animateShake('enemy', () => {
+      battleEnemySim.hp = Math.max(0, battleEnemySim.hp - dmg);
+      updateHPbars();
+      if(battleEnemySim.hp <= 0){ setTimeout(()=>{ sfx.win(); onBattleWin(); }, 260); return; }
+      setTimeout(()=> enemyTurn(), 400);
+    });
   }
 
   function enemyTurn(){
-    if(!battleEnemySim||!battlePlayerSim) return;
+    if(!battleEnemySim || !battlePlayerSim) return;
     const atk = (battleEnemySim.attacks && battleEnemySim.attacks.length) ? battleEnemySim.attacks[Math.floor(Math.random()*battleEnemySim.attacks.length)] : {name:'Tackle',dmg:6};
-    ensureAudio(); sfxAtk();
+    ensureAudio(); sfx.atk();
     const dmg = Math.max(1, atk.dmg + Math.floor((Math.random()-0.5)*4));
-    battlePlayerSim.hp = Math.max(0, battlePlayerSim.hp - dmg);
-    updateHPbars();
-    if(battlePlayerSim.hp<=0){ setTimeout(()=> onBattleLose(), 260); }
+    animateShake('player', () => {
+      battlePlayerSim.hp = Math.max(0, battlePlayerSim.hp - dmg);
+      updateHPbars();
+      if(battlePlayerSim.hp <= 0){ setTimeout(()=> onBattleLose(), 260); }
+    });
   }
 
   function onBattleWin(){
     panel('battlePanel', false);
     if(currentEncounter && currentEncounter !== 'npc'){
-      player.xp = (player.xp||0)+12;
+      player.xp = (player.xp||0) + 12;
       const idx = sims.indexOf(currentEncounter); if(idx>=0) sims.splice(idx,1);
       simdex[currentEncounter.type.name + '-' + Date.now()] = {
         name: currentEncounter.type.name,
@@ -853,22 +824,47 @@
       alert(`Victory! Claimed ${currentEncounter.type.name} and added to SimDex + team.`);
       currentEncounter = null;
     } else {
-      player.xp = (player.xp||0)+18; alert('You won the NPC battle! XP gained.');
+      player.xp = (player.xp||0)+18;
+      alert('You won the NPC battle! XP gained.');
     }
-    battleEnemySim = null; battlePlayerSim = null; mode = 'world';
+    battleEnemySim = null; battlePlayerSim = null; mode='world';
   }
 
   function onBattleLose(){
     panel('battlePanel', false);
     alert('You lost. Your Sim recovers to half HP.');
     if(player.sims[0]) player.sims[0].hp = Math.max(1, Math.floor(player.sims[0].maxHp * 0.5));
-    battleEnemySim = null; battlePlayerSim = null; mode = 'world';
+    battleEnemySim = null; battlePlayerSim = null; mode='world';
   }
 
-  /* ---------- Choose Sim Panel ---------- */
+  // shake animation: type='player' or 'enemy'
+  function animateShake(target, cb){
+    const dur = 300; const start = performance.now();
+    function frame(now){
+      const t = (now - start)/dur;
+      draw(); // redraw static scene or battle background
+      // draw overlay sprites for shake effect
+      ctx.save();
+      const offset = Math.sin(t*30) * 8 * (1 - t);
+      // draw enemy/player label area offsets to simulate shake - simple representation
+      if(target === 'enemy'){
+        // enemy sprite area (top-right in battle panel)
+        const panelX = (cvs.width - 420)/2 + 260, panelY = 120; // approximate positions (we keep it abstract)
+        ctx.translate(offset, 0);
+      } else {
+        ctx.translate(-offset, 0);
+      }
+      ctx.restore();
+      if(t < 1) requestAnimationFrame(frame);
+      else cb();
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // ----- Choose sim UI -----
   function openChooseSim(cb){
     const list = document.getElementById('chooseSimList'); list.innerHTML = '';
-    if(player.sims.length===0){ alert('No sims in your team!'); cb(null); return; }
+    if(player.sims.length === 0){ alert('No sims in your team!'); cb(null); return; }
     player.sims.forEach((s,i)=>{
       const el = document.createElement('button'); el.className='btn'; el.textContent = `${s.type.name} (HP:${s.hp}/${s.maxHp})`;
       el.addEventListener('click', ()=>{ document.getElementById('chooseSimPanel').classList.remove('show'); cb(s); });
@@ -878,23 +874,65 @@
     panel('chooseSimPanel', true);
   }
 
-  /* ---------- Panel helper ---------- */
-  function panel(id, show){ document.querySelectorAll('.panel').forEach(p=>p.classList.remove('show')); if(show) document.getElementById(id).classList.add('show'); }
-  function wire(id, fn){ const el=document.getElementById(id); el.addEventListener('click', fn); el.addEventListener('touchstart', e=>{ e.preventDefault(); fn(); }, {passive:false}); }
-
-  /* ---------- Render Loop ---------- */
+  // ----- Render loop -----
   (function renderLoop(){
-    if(mode==='world') draw();
+    if(mode === 'world') draw();
     requestAnimationFrame(renderLoop);
   })();
 
-  /* ---------- Utils ---------- */
+  // ----- Helpers -----
   function isTouch(){ return /Mobi|Android|iPhone|iPad|iPod|Tablet/i.test(navigator.userAgent); }
 
-  // Startup: if entering world directly via saved state, ensure D-pad visibility on touch
-  if(mode==='world' && isTouch()){ document.getElementById('dpad').style.display = 'grid'; }
+  // If we start in world (from saved), show controls appropriately
+  if(mode==='world' && isTouch()) document.getElementById('dpad').style.display = 'grid';
 
-})(); // IIFE end
+  // Expose a utility to place images by clicking button (already done via file inputs)
+  // Save when "Remember Me" is checked on sign-in
+  document.getElementById('rememberMe').addEventListener('change', (e)=>{
+    if(!e.target.checked) return; // only saves when checked
+  });
+
+  // When clicking on the canvas, attempt to interact with tile under center or clicked tile by mapping click
+  cvs.addEventListener('click', (ev)=>{
+    // compute clicked tile in viewport coordinates
+    const rect = cvs.getBoundingClientRect();
+    const cx = ev.clientX - rect.left;
+    const cy = ev.clientY - rect.top;
+    // tile coords relative to viewport
+    const tx = Math.floor(cx / TILE);
+    const ty = Math.floor(cy / TILE);
+    // world coords
+    const vx0 = player.x - Math.floor(VIEW_W/2);
+    const vy0 = player.y - Math.floor(VIEW_H/2);
+    const wx = vx0 + tx, wy = vy0 + ty;
+    // if clicked tile equals NPC or sim and player is on top of it? The user asked: "when i go on top of the simitaur" — it's already triggered on movement.
+    // But allow clicking to move to tile (walk) in case user wants to click target
+    // compute step path of one tile towards clicked tile (simple)
+    const dx = Math.sign(wx - player.x), dy = Math.sign(wy - player.y);
+    if(Math.abs(wx - player.x) + Math.abs(wy - player.y) > 0){
+      // Move one step towards clicked tile
+      move(dx, dy);
+    }
+  });
+
+  // When finished interactions, optionally save
+  // Save whenever "Remember Me" checked after catches/wins etc.
+  // Add small autosave after key events:
+  function maybeSave(){ if(document.getElementById('rememberMe').checked) saveGame(); }
+
+  // ----- Simple startup UI behavior -----
+  // Make Start show only when signed in (already handled toggle above).
+  // show sign-in panel initially
+  panel('menu', true);
+
+  // ----- Small safeguard: expose a reload spawnSims button on dev console if needed -----
+  window.Simitaur = { spawnSims, saveGame, loadGame, simdex, player, sims };
+
+  // Done!
+})();
 </script>
 </body>
 </html>
+
+
+This is my game code 
