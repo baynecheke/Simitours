@@ -3,103 +3,101 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>Simitaur Adventure — Container UI</title>
+<title>Simitaur Adventure Overlay</title>
 <style>
-  body {margin:0; background:#0e1610; color:white; font-family:sans-serif; overflow:hidden;}
+  body {
+    margin:0; background:#0e1610; color:white;
+    font-family:sans-serif; overflow:hidden;
+  }
   canvas {display:block;}
 
-  /* UI Overlay */
+  /* Overlay */
   #ui {
-    position:fixed; top:0; left:0; width:100%; height:100%;
-    pointer-events:none; /* disables background clicks */
+    position:fixed; top:0; left:0;
+    width:100%; height:100%;
+    pointer-events:none;
   }
+
+  /* Coins display */
   .coins {
-    position:absolute; top:10px; left:10px; background:#16261a; padding:6px 12px;
-    border-radius:10px;
-    pointer-events:auto; /* clickable */
+    position:absolute; top:12px; left:12px;
+    background:linear-gradient(135deg,#ffd166,#ffb347);
+    padding:8px 14px; border-radius:50px;
+    font-weight:bold; color:#222;
+    pointer-events:auto; user-select:none;
+    box-shadow:0 0 12px rgba(0,0,0,0.4);
   }
+
+  /* Menu buttons */
   .menu-buttons {
-    position:absolute; top:10px; right:10px; display:flex; gap:8px;
-    pointer-events:auto; /* clickable */
-  }
-  .menu-buttons button {
-    background:#ffd166; color:black; border:none; padding:6px 10px; border-radius:8px;
-    cursor:pointer; font-weight:bold;
+    position:absolute; top:12px; right:12px;
+    display:flex; gap:10px;
     pointer-events:auto;
   }
+  .menu-buttons button {
+    background:#ffd166; color:#222;
+    border:none; padding:8px 12px;
+    border-radius:8px; font-weight:bold;
+    cursor:pointer; font-size:16px;
+    box-shadow:0 2px 6px rgba(0,0,0,0.3);
+    transition:transform 0.1s;
+  }
+  .menu-buttons button:hover {transform:scale(1.05);}
 
-  /* Panel Container */
+  /* Panels */
   .panel {
-    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
-    background:#16261a; border:2px solid #ffd166; border-radius:12px;
-    padding:20px; display:none; width:360px; max-width:90%;
-    pointer-events:auto; /* clickable */
-    box-shadow:0 0 25px rgba(0,0,0,0.7);
+    position:absolute; top:50%; left:50%;
+    transform:translate(-50%,-50%);
+    background:#16261a; border:2px solid #ffd166;
+    border-radius:14px; padding:20px;
+    display:none; width:360px; max-width:90%;
+    pointer-events:auto; box-shadow:0 0 25px rgba(0,0,0,0.7);
   }
-  .panel h2 {margin-top:0; color:#ffd166;}
+  .panel h2 {margin-top:0; color:#ffd166; text-align:center;}
   .close-btn {
-    background:#ff6b6b; color:white; border:none; padding:6px 12px; border-radius:6px;
-    cursor:pointer; font-weight:bold; margin-top:10px;
+    background:#ff6b6b; color:white;
+    border:none; padding:8px 12px;
+    border-radius:6px; cursor:pointer;
+    font-weight:bold; margin-top:14px; width:100%;
   }
 
-  /* Quest + Simdex styling */
+  /* Quest + Simdex */
   .quest, .simdex-entry {
-    margin:8px 0; background:#0e1610; padding:8px; border-radius:6px;
+    margin:8px 0; background:#0e1610;
+    padding:10px; border-radius:6px;
     border:1px solid #ffd166;
   }
   .quest button, .simdex-entry button {
-    margin-top:6px; width:100%; background:#ffd166; border:none;
+    margin-top:6px; width:100%;
+    background:#ffd166; border:none;
     padding:6px; cursor:pointer; border-radius:6px;
+    font-weight:bold;
   }
 </style>
 </head>
 <body>
 <canvas id="gameCanvas" width="800" height="600"></canvas>
 
-<!-- UI -->
+<!-- Overlay -->
 <div id="ui">
-  <div class="coins">Coins: <span id="coinCount">0</span></div>
+  <div class="coins">💰 <span id="coinCount">0</span></div>
   <div class="menu-buttons">
-    <button onclick="openPanel('settingsPanel')">⚙️</button>
-    <button onclick="openPanel('shopPanel')">🛒</button>
-    <button onclick="openPanel('questPanel')">📜</button>
+    <button id="settingsBtn">⚙️</button>
+    <button id="shopBtn">🛒</button>
+    <button id="questBtn">📜</button>
   </div>
 
-  <!-- Settings -->
-  <div id="settingsPanel" class="panel">
-    <h2>Settings</h2>
-    <button onclick="alert('Music toggled!')">Toggle Music</button>
-    <button class="close-btn" onclick="closePanels()">Close</button>
-  </div>
-
-  <!-- Shop -->
-  <div id="shopPanel" class="panel">
-    <h2>Marketplace</h2>
-    <p>Select a Simitaur to heal (cost <b>5 coins</b>):</p>
-    <div id="simdexList"></div>
-    <button class="close-btn" onclick="closePanels()">Close</button>
-  </div>
-
-  <!-- Quests -->
-  <div id="questPanel" class="panel">
-    <h2>Quests</h2>
-    <div id="quests"></div>
-    <hr>
-    <p><b>Test Controls:</b></p>
-    <button onclick="catchSimitaur(false)">Catch Normal Simitaur</button>
-    <button onclick="catchSimitaur(true)">Catch Exotic Simitaur</button>
-    <button onclick="updateCoins(10)">+10 Coins</button>
-    <br><br>
-    <button class="close-btn" onclick="closePanels()">Close</button>
-  </div>
+  <div id="settingsPanel" class="panel"></div>
+  <div id="shopPanel" class="panel"></div>
+  <div id="questPanel" class="panel"></div>
 </div>
 
 <script>
-let coins = 20; // start with coins for testing
+// ====== Game State ======
+let coins = 20;
 let simitaursCaught = 0;
 let exoticsCaught = 0;
 
-// Fake Simdex for demo
 let simdex = [
   {id:1, name:"Leafhorn", hp:20, maxHp:50},
   {id:2, name:"Flametail", hp:45, maxHp:45},
@@ -111,31 +109,73 @@ let quests = [
   {id:2, text:"Catch 1 Exotic Simitaur (Reward: 100 coins)", goal:1, progress:0, reward:100, type:"exotic", completed:false}
 ];
 
+// ====== UI Functions ======
 function updateCoins(amount){
   coins += amount;
   document.getElementById("coinCount").innerText = coins;
 }
 
-function openPanel(id){
+function openPanel(panelId){
   closePanels();
-  const panel=document.getElementById(id);
-  panel.style.display="block";
-  if(id==="shopPanel") renderSimdex();
-  if(id==="questPanel") renderQuests();
+  const panel = document.getElementById(panelId);
+  panel.style.display = "block";
+  if(panelId==="shopPanel") renderShop();
+  if(panelId==="questPanel") renderQuests();
+  if(panelId==="settingsPanel") renderSettings();
 }
 
 function closePanels(){
   document.querySelectorAll(".panel").forEach(p=>p.style.display="none");
 }
 
+// Render panels
+function renderSettings(){
+  let panel = document.getElementById("settingsPanel");
+  panel.innerHTML = `
+    <h2>Settings</h2>
+    <button onclick="alert('Music toggled!')">Toggle Music</button>
+    <button class="close-btn" onclick="closePanels()">Close</button>
+  `;
+}
+
+function renderShop(){
+  let panel = document.getElementById("shopPanel");
+  panel.innerHTML = `<h2>Marketplace</h2>
+    <p>Select a Simitaur to heal (cost <b>5 coins</b>):</p>
+    <div id="simdexList"></div>
+    <button class="close-btn" onclick="closePanels()">Close</button>`;
+  let sDiv = document.getElementById("simdexList");
+  simdex.forEach(creature=>{
+    let div=document.createElement("div");
+    div.className="simdex-entry";
+    div.innerHTML=`<b>${creature.name}</b><br>
+      HP: ${creature.hp}/${creature.maxHp}`;
+    let btn=document.createElement("button");
+    btn.textContent="Heal (5 coins)";
+    btn.onclick=()=>healCreature(creature);
+    div.appendChild(btn);
+    sDiv.appendChild(div);
+  });
+}
+
 function renderQuests(){
-  const qDiv=document.getElementById("quests");
-  qDiv.innerHTML="";
+  let panel = document.getElementById("questPanel");
+  panel.innerHTML = `<h2>Quests</h2>
+    <div id="quests"></div>
+    <hr>
+    <p><b>Test Controls:</b></p>
+    <button onclick="catchSimitaur(false)">Catch Normal Simitaur</button>
+    <button onclick="catchSimitaur(true)">Catch Exotic Simitaur</button>
+    <button onclick="updateCoins(10)">+10 Coins</button>
+    <br><br>
+    <button class="close-btn" onclick="closePanels()">Close</button>`;
+  
+  let qDiv=document.getElementById("quests");
   quests.forEach(q=>{
     let div=document.createElement("div");
     div.className="quest";
     div.innerHTML=`<b>${q.text}</b><br>
-    Progress: ${q.progress}/${q.goal}<br>`;
+      Progress: ${q.progress}/${q.goal}<br>`;
     if(!q.completed && q.progress>=q.goal){
       let btn=document.createElement("button");
       btn.textContent="Claim Reward";
@@ -152,6 +192,7 @@ function renderQuests(){
   });
 }
 
+// Gameplay logic
 function catchSimitaur(isExotic=false){
   if(isExotic){
     exoticsCaught++;
@@ -165,22 +206,6 @@ function catchSimitaur(isExotic=false){
   renderQuests();
 }
 
-function renderSimdex(){
-  const sDiv=document.getElementById("simdexList");
-  sDiv.innerHTML="";
-  simdex.forEach(creature=>{
-    let div=document.createElement("div");
-    div.className="simdex-entry";
-    div.innerHTML=`<b>${creature.name}</b><br>
-      HP: ${creature.hp}/${creature.maxHp}<br>`;
-    let btn=document.createElement("button");
-    btn.textContent="Heal (5 coins)";
-    btn.onclick=()=>healCreature(creature);
-    div.appendChild(btn);
-    sDiv.appendChild(div);
-  });
-}
-
 function healCreature(creature){
   if(creature.hp>=creature.maxHp){
     alert(`${creature.name} is already at full health!`);
@@ -190,15 +215,18 @@ function healCreature(creature){
     coins-=5;
     creature.hp=creature.maxHp;
     updateCoins(0);
-    renderSimdex();
+    renderShop();
   } else {
     alert("Not enough coins!");
   }
 }
 
-// Initialize
+// ====== Init ======
+document.getElementById("settingsBtn").onclick=()=>openPanel("settingsPanel");
+document.getElementById("shopBtn").onclick=()=>openPanel("shopPanel");
+document.getElementById("questBtn").onclick=()=>openPanel("questPanel");
+
 updateCoins(0);
-renderQuests();
 </script>
 </body>
 </html>
