@@ -27,27 +27,47 @@
   questBtn.textContent = 'Quests';
   hud.appendChild(questBtn);
 
-  // ===== Overlay Panels (not full-screen) =====
-  function makeOverlay(id, title, innerId){
-    const panel = document.createElement('div');
-    panel.id = id;
-    panel.style.cssText = `
-      position:fixed;top:50px;left:50%;transform:translateX(-50%);
+  // ===== Draggable Window Creator =====
+  function makeWindow(id, title, innerId){
+    const win = document.createElement('div');
+    win.id = id;
+    win.style.cssText = `
+      position:fixed;top:80px;left:80px;
       background:#16261a;border:2px solid #ffd166;border-radius:12px;
-      box-shadow:0 0 25px rgba(0,0,0,0.6);padding:14px 18px;z-index:9999;
-      min-width:320px;max-width:90%;display:none;color:#fff;
+      box-shadow:0 0 25px rgba(0,0,0,0.6);padding:10px;z-index:9999;
+      min-width:280px;max-width:360px;color:#fff;display:none;
     `;
-    panel.innerHTML = `
-      <h2 style="margin-top:0;color:#ffd166">${title}</h2>
-      <div id="${innerId}" style="max-height:60vh;overflow:auto"></div>
-      <div style="text-align:center;margin-top:10px"><button class="btn" onclick="document.getElementById('${id}').style.display='none'">Close</button></div>
+    win.innerHTML = `
+      <h2 style="margin:0;cursor:move;color:#ffd166;font-size:18px">${title}</h2>
+      <div id="${innerId}" style="margin-top:8px;max-height:60vh;overflow:auto"></div>
+      <div style="text-align:center;margin-top:10px">
+        <button class="btn" onclick="document.getElementById('${id}').style.display='none'">Close</button>
+      </div>
     `;
-    document.body.appendChild(panel);
-    return panel;
+    document.body.appendChild(win);
+    makeDraggable(win);
+    return win;
   }
 
-  const shopPanel = makeOverlay('shopPanel','Marketplace','simdexList');
-  const questPanel = makeOverlay('questPanel','Quests','questList');
+  function makeDraggable(el){
+    const header = el.querySelector('h2');
+    let offsetX=0, offsetY=0, dragging=false;
+    header.onmousedown = e=>{
+      dragging = true;
+      offsetX = e.clientX - el.offsetLeft;
+      offsetY = e.clientY - el.offsetTop;
+      document.onmousemove = e2=>{
+        if(!dragging) return;
+        el.style.left = (e2.clientX - offsetX) + "px";
+        el.style.top  = (e2.clientY - offsetY) + "px";
+      };
+      document.onmouseup = ()=>{ dragging=false; document.onmousemove=null; };
+    };
+  }
+
+  // ===== Windows =====
+  const shopWin = makeWindow('shopWin','Marketplace','simdexList');
+  const questWin = makeWindow('questWin','Quests','questList');
 
   // ===== Functions =====
   function updateCoins(amount){
@@ -56,7 +76,7 @@
   }
 
   function renderShop(){
-    shopPanel.style.display = 'block';
+    shopWin.style.display = 'block';
     const list = document.getElementById('simdexList');
     list.innerHTML = '';
     if(window.Simitaur?.player?.sims?.length){
@@ -86,7 +106,7 @@
   }
 
   function renderQuests(){
-    questPanel.style.display = 'block';
+    questWin.style.display = 'block';
     const list = document.getElementById('questList');
     list.innerHTML = '';
     quests.forEach(q=>{
@@ -119,7 +139,6 @@
   if(oldBuildDex){
     window.Simitaur.buildDex = function(){
       oldBuildDex();
-      // update quest progress for "catch" type
       const keys = Object.keys(window.Simitaur.simdex||{});
       quests.forEach(q=>{
         if(q.type.toLowerCase()==='simitaur') q.progress = keys.length;
@@ -134,4 +153,3 @@
   updateCoins(0);
 })();
 </script>
-
