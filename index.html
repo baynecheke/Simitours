@@ -1128,7 +1128,7 @@
     // choose random sim type to be boss variant (but scaled)
     const t=types[Math.floor(Math.random()*types.length)];
     const x = Math.floor(Math.random()*MAP_W), y = Math.floor(Math.random()*MAP_H);
-    const hp = 500;
+    const hp = 150;
     // boss attacks are lower damage but consistent
     const attacks = [{name:'Heavy Swipe', dmg:9}, {name:'Stomp', dmg:7}, {name:'Gnaw', dmg:8}];
     worldBoss = { type: t, x, y, hp: hp, maxHp: hp, attacks, spawnedAt: Date.now() };
