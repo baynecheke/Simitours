@@ -1344,9 +1344,9 @@ window.addEventListener("load", () => {
 });
 </script>
 <!-- Firebase SDKs -->
-<script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js"></script>
-<script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-analytics.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-analytics-compat.js"></script>
 
 <script>
   const firebaseConfig = {
@@ -1360,11 +1360,9 @@ window.addEventListener("load", () => {
     measurementId: "G-T6K30LZTLK"
   };
 
-  // Initialize Firebase
   const app = firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
 
-  // 🔹 Test connection
   db.ref("test").set({ connected: true });
   db.ref("test").on("value", (snapshot) => {
     console.log("✅ Firebase connected:", snapshot.val());
