@@ -1209,9 +1209,49 @@
     const h = Math.floor(rem/3600000);
     el.textContent = `Next Boss: ${h}h ${m}m ${s}s`;
   }
+// ----- Continuous Update -----
+function update(dt){
+  if(mode === 'world'){
+    updatePlayer(dt);
+    updateAnimations(dt);
+    drawMini(); // keeps minimap live
+  }
+}
 
-  // ----- Render loop -----
-  (function renderLoop(){ if(mode==='world'){ draw(); } requestAnimationFrame(renderLoop); })();
+function updatePlayer(dt){
+  // Smooth player movement toward target
+  if(player.targetX !== undefined && player.targetY !== undefined){
+    const speed = 4; // tiles per second
+    const dx = player.targetX - player.x;
+    const dy = player.targetY - player.y;
+    const dist = Math.hypot(dx, dy);
+    if(dist > 0.05){
+      player.x += (dx / dist) * speed * dt;
+      player.y += (dy / dist) * speed * dt;
+    }
+  }
+}
+
+function updateAnimations(dt){
+  // placeholder for future animation logic (coins, glow, etc.)
+}
+
+// ----- Render loop (smooth continuous updates) -----
+let lastTime = performance.now();
+function renderLoop(now){
+  const dt = (now - lastTime) / 1000; // seconds since last frame
+  lastTime = now;
+
+  // update game logic every frame
+  update(dt);
+
+  // draw the scene
+  draw();
+
+  requestAnimationFrame(renderLoop);
+}
+requestAnimationFrame(renderLoop);
+ 
 
   // ----- Helpers -----
   function isTouch(){ return /Mobi|Android|iPhone|iPad|iPod|Tablet/i.test(navigator.userAgent); }
