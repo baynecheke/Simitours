@@ -1343,6 +1343,32 @@ window.addEventListener("load", () => {
   }, 7000);
 });
 </script>
+<!-- ✅ Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js"></script>
+
+<script>
+  // Your web app's Firebase configuration
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY", 
+    authDomain: "simitaurs.firebaseapp.com",
+    databaseURL: "https://simitaurs-default-rtdb.firebaseio.com",
+    projectId: "simitaurs",
+    storageBucket: "simitaurs.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
+  };
+
+  // Initialize Firebase
+  const app = firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  // 🔹 Test: write and read from database
+  db.ref("test").set({ connected: true });
+  db.ref("test").on("value", (snapshot) => {
+    console.log("Firebase connected:", snapshot.val());
+  });
+</script>
 
 </body>
 </html>
