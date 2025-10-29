@@ -1346,7 +1346,6 @@ window.addEventListener("load", () => {
 <!-- ✅ Firebase SDKs (v9 compat mode) -->
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-analytics-compat.js"></script>
 
 <script>
   const firebaseConfig = {
@@ -1364,22 +1363,15 @@ window.addEventListener("load", () => {
   const app = firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
 
-  // 🔹 Test connection
-  db.ref("test").set({ connected: true });
-  db.ref("test").on("value", (snapshot) => {
-    console.log("✅ Firebase connected:", snapshot.val());
-  });
-</script>
-<script>
   // 🔹 Create unique player ID
   const playerId = "player_" + Math.floor(Math.random() * 99999);
-  const roomId = "world1"; // You can make more rooms later
+  const roomId = "world1"; // Room name
   const playerRef = db.ref(`rooms/${roomId}/players/${playerId}`);
 
   // 🔹 Add player to database
   playerRef.set({
-    x: 0,
-    y: 0,
+    x: Math.floor(Math.random() * 500),
+    y: Math.floor(Math.random() * 300),
     hp: 100,
     online: true
   });
@@ -1387,26 +1379,48 @@ window.addEventListener("load", () => {
   // 🔹 Remove player if they disconnect
   playerRef.onDisconnect().remove();
 
+  // 🔹 Track all players locally
+  let allPlayers = {};
+
   // 🔹 Listen for all players
   db.ref(`rooms/${roomId}/players`).on("value", (snapshot) => {
-    const players = snapshot.val();
-    console.log("👥 All players in world:", players);
-    // 👉 Here you can update or draw all other players in your canvas
+    allPlayers = snapshot.val() || {};
+    updatePlayersOnScreen();
   });
 
-  // 🔹 Call this whenever your player moves in your game
+  // 🔹 Update your player position (example: random movement every 2 sec)
   function updatePlayerPosition(x, y) {
     playerRef.update({ x, y });
   }
-
-  // Example: update every 2 seconds for testing
   setInterval(() => {
     const x = Math.floor(Math.random() * 500);
     const y = Math.floor(Math.random() * 300);
     updatePlayerPosition(x, y);
   }, 2000);
+
+  // 🔹 Draw players on screen
+  function updatePlayersOnScreen() {
+    // Remove old player elements
+    document.querySelectorAll(".player").forEach(el => el.remove());
+
+    for (const id in allPlayers) {
+      const p = allPlayers[id];
+      const playerDiv = document.createElement("div");
+      playerDiv.className = "player";
+      playerDiv.style.position = "absolute";
+      playerDiv.style.width = "40px";
+      playerDiv.style.height = "40px";
+      playerDiv.style.borderRadius = "50%";
+      playerDiv.style.background = id === playerId ? "blue" : "red"; // your player blue, others red
+      playerDiv.style.left = p.x + "px";
+      playerDiv.style.top = p.y + "px";
+      playerDiv.innerText = id === playerId ? "You" : "";
+      document.body.appendChild(playerDiv);
+    }
+  }
 </script>
 
+  
 
 
 </body>
