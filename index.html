@@ -1346,30 +1346,29 @@ window.addEventListener("load", () => {
 <!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-analytics.js"></script>
 
 <script>
   const firebaseConfig = {
-    apiKey: "YOUR_REAL_API_KEY",
+    apiKey: "AIzaSyCxyW86qYBD41T_6PdM0mMtg233sQfCbAM",
     authDomain: "simitaurs.firebaseapp.com",
     databaseURL: "https://simitaurs-default-rtdb.firebaseio.com",
     projectId: "simitaurs",
-    storageBucket: "simitaurs.appspot.com",
-    messagingSenderId: "YOUR_SENDER_ID",
-    appId: "YOUR_APP_ID"
+    storageBucket: "simitaurs.firebasestorage.app",
+    messagingSenderId: "415340567485",
+    appId: "1:415340567485:web:99538c93559940f7c890d4",
+    measurementId: "G-T6K30LZTLK"
   };
 
   // Initialize Firebase
   const app = firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
+  const analytics = firebase.analytics();
 
-  // 🔹 Test write + read
+  // Test it
   db.ref("test").set({ connected: true });
-  db.ref("test").on("value", (snapshot) => {
-    console.log("✅ Firebase connected:", snapshot.val());
-  });
+  db.ref("test").on("value", (snap) => console.log("✅ Firebase connected:", snap.val()));
 </script>
-</body>
-</html>
 
 </body>
 </html>
