@@ -1343,32 +1343,33 @@ window.addEventListener("load", () => {
   }, 7000);
 });
 </script>
-<!-- ✅ Firebase SDKs -->
+<!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js"></script>
 
 <script>
-  // Your web app's Firebase configuration
   const firebaseConfig = {
-    apiKey: "AIzaSyCxyW86qYBD41T_6PdM0mMtg233sQfCbAM", 
+    apiKey: "YOUR_REAL_API_KEY",
     authDomain: "simitaurs.firebaseapp.com",
     databaseURL: "https://simitaurs-default-rtdb.firebaseio.com",
     projectId: "simitaurs",
-    storageBucket: "simitaurs.firebasestorage.app",
-    messagingSenderId: "415340567485",
-    appId: "1:415340567485:web:99538c93559940f7c890d4"
+    storageBucket: "simitaurs.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
   };
 
   // Initialize Firebase
   const app = firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
 
-  // 🔹 Test: write and read from database
+  // 🔹 Test write + read
   db.ref("test").set({ connected: true });
   db.ref("test").on("value", (snapshot) => {
-    console.log("Firebase connected:", snapshot.val());
+    console.log("✅ Firebase connected:", snapshot.val());
   });
 </script>
+</body>
+</html>
 
 </body>
 </html>
