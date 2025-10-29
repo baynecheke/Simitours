@@ -1343,7 +1343,7 @@ window.addEventListener("load", () => {
   }, 7000);
 });
 </script>
-<!-- Firebase SDKs -->
+<!-- ✅ Firebase SDKs (v9 compat mode) -->
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-analytics-compat.js"></script>
@@ -1360,14 +1360,17 @@ window.addEventListener("load", () => {
     measurementId: "G-T6K30LZTLK"
   };
 
+  // Initialize Firebase
   const app = firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
 
+  // 🔹 Test connection
   db.ref("test").set({ connected: true });
   db.ref("test").on("value", (snapshot) => {
     console.log("✅ Firebase connected:", snapshot.val());
   });
 </script>
+
 
 
 </body>
