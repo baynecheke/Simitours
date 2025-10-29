@@ -1363,12 +1363,14 @@ window.addEventListener("load", () => {
   // Initialize Firebase
   const app = firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
-  const analytics = firebase.analytics();
 
-  // Test it
+  // 🔹 Test connection
   db.ref("test").set({ connected: true });
-  db.ref("test").on("value", (snap) => console.log("✅ Firebase connected:", snap.val()));
+  db.ref("test").on("value", (snapshot) => {
+    console.log("✅ Firebase connected:", snapshot.val());
+  });
 </script>
+
 
 </body>
 </html>
