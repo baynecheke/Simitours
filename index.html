@@ -1364,7 +1364,6 @@ window.addEventListener("load", () => {
   firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
 
-  // Canvas
   const canvas = document.getElementById("gameCanvas");
   const ctx = canvas.getContext("2d");
 
@@ -1372,7 +1371,13 @@ window.addEventListener("load", () => {
   const playerId = "player_" + Math.floor(Math.random() * 999999);
   const roomId = "world1";
   const playerRef = db.ref(`rooms/${roomId}/players/${playerId}`);
-  const player = { x: 100, y: 100, size: 40 };
+  const player = { x: 100, y: 100, width: 50, height: 50 };
+
+  // Load your Simitaur sprites
+  const yourSprite = new Image();
+  yourSprite.src = "sprites/yourSimitaur.png"; // replace with your sprite path
+  const otherSprite = new Image();
+  otherSprite.src = "sprites/otherSimitaur.png"; // replace with other player sprite path
 
   // Add player to Firebase
   playerRef.set({ x: player.x, y: player.y, hp: 100, online: true });
@@ -1380,61 +1385,43 @@ window.addEventListener("load", () => {
 
   // Track all players
   let allPlayers = {};
-
   db.ref(`rooms/${roomId}/players`).on("value", snapshot => {
     allPlayers = snapshot.val() || {};
   });
 
-  // Update your real player position
   function updatePlayerPosition(x, y) {
     playerRef.update({ x, y });
   }
 
-  // Movement (example: arrow keys)
+  // Movement (replace with your real game movement)
   document.addEventListener("keydown", e => {
-    if (e.key === "ArrowRight") player.x += 5;
-    if (e.key === "ArrowLeft") player.x -= 5;
-    if (e.key === "ArrowUp") player.y -= 5;
-    if (e.key === "ArrowDown") player.y += 5;
-
+    const speed = 5;
+    if (e.key === "ArrowRight") player.x += speed;
+    if (e.key === "ArrowLeft") player.x -= speed;
+    if (e.key === "ArrowUp") player.y -= speed;
+    if (e.key === "ArrowDown") player.y += speed;
     updatePlayerPosition(player.x, player.y);
   });
 
-  // 🔹 Function to calculate distance
+  // Distance calculation
   function distance(p1, p2) {
     return Math.hypot(p1.x - p2.x, p1.y - p2.y);
   }
 
-  // Render loop
+  const visibleDistance = 150;
+
   function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // Draw your player
-    ctx.beginPath();
-    ctx.arc(player.x + 20, player.y + 20, 20, 0, Math.PI * 2);
-    ctx.fillStyle = "blue";
-    ctx.fill();
-    ctx.stroke();
-    ctx.closePath();
-    ctx.fillStyle = "white";
-    ctx.font = "12px Arial";
-    ctx.textAlign = "center";
-    ctx.fillText("You", player.x + 20, player.y + 25);
+    ctx.drawImage(yourSprite, player.x, player.y, player.width, player.height);
 
-    // Draw other players **only if close enough**
-    const visibleDistance = 100; // change this to adjust how close they need to be
+    // Draw other players if close enough
     for (const id in allPlayers) {
-      if (id === playerId) continue; // skip yourself
+      if (id === playerId) continue;
       const p = allPlayers[id];
       if (distance(player, p) <= visibleDistance) {
-        ctx.beginPath();
-        ctx.arc(p.x + 20, p.y + 20, 20, 0, Math.PI * 2);
-        ctx.fillStyle = "red";
-        ctx.fill();
-        ctx.stroke();
-        ctx.closePath();
-        ctx.fillStyle = "white";
-        ctx.fillText("Player", p.x + 20, p.y + 25);
+        ctx.drawImage(otherSprite, p.x, p.y, player.width, player.height);
       }
     }
 
@@ -1443,6 +1430,7 @@ window.addEventListener("load", () => {
 
   draw();
 </script>
+
 
 
 
