@@ -613,7 +613,7 @@
   }
   function drawRarityFX(s, sx, sy){
     const x=sx*TILE, y=sy*TILE; ctx.save();
-    const p=sparklePhase + s.x*0.5 + s.y*0.3;
+    const p = animTime * 2 + s.x * 0.5 + s.y * 0.3;
     const sparkle=(color,count=2)=>{ for(let i=0;i<count;i++){ const ox=Math.floor((Math.sin(p*3+i*1.7)*0.5+0.5)*(TILE-18))+8; const oy=Math.floor((Math.cos(p*2+i*2.3)*0.5+0.5)*(TILE-18))+8; ctx.fillStyle=color; ctx.globalAlpha=0.6+0.4*Math.sin(p*4+i); ctx.fillRect(x+ox,y+oy,5,5);} ctx.globalAlpha=1; };
     switch(s.rarity){
       case 'Common': sparkle('#53a9ff',2); ctx.strokeStyle='rgba(120,180,255,0.35)'; ctx.lineWidth=2; ctx.strokeRect(x+3,y+3,TILE-6,TILE-6); break;
