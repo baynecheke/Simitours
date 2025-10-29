@@ -1240,20 +1240,25 @@ function updateAnimations(dt){
 
 // ----- Render loop (smooth continuous updates) -----
 let lastTime = performance.now();
-function renderLoop(now){
+function renderLoop(now) {
   const dt = (now - lastTime) / 1000; // seconds since last frame
   lastTime = now;
 
-  // update game logic every frame
-  update(dt);
+  // 🔹 Advance global animation timer for sparkles, glows, etc.
+  animTime += dt;
 
-  // draw the scene
-  draw();
+  // 🔹 Optional: update other continuous world logic
+  // update(dt); // ← only if you already have this defined and need it
+
+  // 🔹 Draw the scene continuously while in world mode
+  if (mode === 'world') {
+    draw();
+  }
 
   requestAnimationFrame(renderLoop);
 }
 requestAnimationFrame(renderLoop);
- 
+
 
   // ----- Helpers -----
   function isTouch(){ return /Mobi|Android|iPhone|iPad|iPod|Tablet/i.test(navigator.userAgent); }
