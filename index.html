@@ -1343,23 +1343,13 @@ window.addEventListener("load", () => {
   }, 7000);
 });
 </script>
-<!-- ✅ Firebase SDKs (v9 compat mode) -->
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
-
-<script>
-<!-- Firebase SDKs -->
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
-
-<script>
 <canvas id="gameCanvas" width="800" height="600" style="border:1px solid #000;"></canvas>
 
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 
 <script>
-  // 🔹 Firebase config
+  // Firebase setup
   const firebaseConfig = {
     apiKey: "AIzaSyCxyW86qYBD41T_6PdM0mMtg233sQfCbAM",
     authDomain: "simitaurs.firebaseapp.com",
@@ -1371,44 +1361,36 @@ window.addEventListener("load", () => {
     measurementId: "G-T6K30LZTLK"
   };
 
-  // 🔹 Initialize Firebase
-  const app = firebase.initializeApp(firebaseConfig);
+  firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
 
-  // 🔹 Canvas setup
+  // Canvas
   const canvas = document.getElementById("gameCanvas");
   const ctx = canvas.getContext("2d");
 
-  // 🔹 Player setup
+  // Player setup
   const playerId = "player_" + Math.floor(Math.random() * 999999);
   const roomId = "world1";
   const playerRef = db.ref(`rooms/${roomId}/players/${playerId}`);
-  
-  // Your actual player coordinates
-  const player = { x: 100, y: 100, size: 40, color: "blue" };
+  const player = { x: 100, y: 100, size: 40 };
 
-  // 🔹 Add player to Firebase
-  playerRef.set({
-    x: player.x,
-    y: player.y,
-    hp: 100,
-    online: true
-  });
+  // Add player to Firebase
+  playerRef.set({ x: player.x, y: player.y, hp: 100, online: true });
   playerRef.onDisconnect().remove();
 
-  // 🔹 Track all players
+  // Track all players
   let allPlayers = {};
 
   db.ref(`rooms/${roomId}/players`).on("value", snapshot => {
     allPlayers = snapshot.val() || {};
   });
 
-  // 🔹 Update player position in Firebase
+  // Update your real player position
   function updatePlayerPosition(x, y) {
     playerRef.update({ x, y });
   }
 
-  // 🔹 Movement (example: arrow keys)
+  // Movement (example: arrow keys)
   document.addEventListener("keydown", e => {
     if (e.key === "ArrowRight") player.x += 5;
     if (e.key === "ArrowLeft") player.x -= 5;
@@ -1418,33 +1400,50 @@ window.addEventListener("load", () => {
     updatePlayerPosition(player.x, player.y);
   });
 
-  // 🔹 Main render loop
+  // 🔹 Function to calculate distance
+  function distance(p1, p2) {
+    return Math.hypot(p1.x - p2.x, p1.y - p2.y);
+  }
+
+  // Render loop
   function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Draw all players
-    for (const id in allPlayers) {
-      const p = allPlayers[id];
-      ctx.beginPath();
-      ctx.arc(p.x + 20, p.y + 20, 20, 0, Math.PI * 2); // 20 = radius
-      ctx.fillStyle = id === playerId ? "blue" : "red";
-      ctx.fill();
-      ctx.strokeStyle = "#000";
-      ctx.stroke();
-      ctx.closePath();
+    // Draw your player
+    ctx.beginPath();
+    ctx.arc(player.x + 20, player.y + 20, 20, 0, Math.PI * 2);
+    ctx.fillStyle = "blue";
+    ctx.fill();
+    ctx.stroke();
+    ctx.closePath();
+    ctx.fillStyle = "white";
+    ctx.font = "12px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("You", player.x + 20, player.y + 25);
 
-      // Optional: draw player ID or "You"
-      ctx.fillStyle = "white";
-      ctx.font = "12px Arial";
-      ctx.textAlign = "center";
-      ctx.fillText(id === playerId ? "You" : "", p.x + 20, p.y + 25);
+    // Draw other players **only if close enough**
+    const visibleDistance = 100; // change this to adjust how close they need to be
+    for (const id in allPlayers) {
+      if (id === playerId) continue; // skip yourself
+      const p = allPlayers[id];
+      if (distance(player, p) <= visibleDistance) {
+        ctx.beginPath();
+        ctx.arc(p.x + 20, p.y + 20, 20, 0, Math.PI * 2);
+        ctx.fillStyle = "red";
+        ctx.fill();
+        ctx.stroke();
+        ctx.closePath();
+        ctx.fillStyle = "white";
+        ctx.fillText("Player", p.x + 20, p.y + 25);
+      }
     }
 
     requestAnimationFrame(draw);
   }
 
-  draw(); // start render loop
+  draw();
 </script>
+
 
 
 
