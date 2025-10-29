@@ -1364,6 +1364,7 @@ window.addEventListener("load", () => {
   firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
 
+  // Canvas
   const canvas = document.getElementById("gameCanvas");
   const ctx = canvas.getContext("2d");
 
@@ -1373,11 +1374,11 @@ window.addEventListener("load", () => {
   const playerRef = db.ref(`rooms/${roomId}/players/${playerId}`);
   const player = { x: 100, y: 100, width: 50, height: 50 };
 
-  // Load your Simitaur sprites
+  // Load your sprites
   const yourSprite = new Image();
   yourSprite.src = "sprites/yourSimitaur.png"; // replace with your sprite path
   const otherSprite = new Image();
-  otherSprite.src = "sprites/otherSimitaur.png"; // replace with other player sprite path
+  otherSprite.src = "sprites/otherSimitaur.png"; // replace with other players sprite path
 
   // Add player to Firebase
   playerRef.set({ x: player.x, y: player.y, hp: 100, online: true });
@@ -1393,7 +1394,7 @@ window.addEventListener("load", () => {
     playerRef.update({ x, y });
   }
 
-  // Movement (replace with your real game movement)
+  // Example movement (replace with your real game movement)
   document.addEventListener("keydown", e => {
     const speed = 5;
     if (e.key === "ArrowRight") player.x += speed;
@@ -1403,7 +1404,6 @@ window.addEventListener("load", () => {
     updatePlayerPosition(player.x, player.y);
   });
 
-  // Distance calculation
   function distance(p1, p2) {
     return Math.hypot(p1.x - p2.x, p1.y - p2.y);
   }
@@ -1416,7 +1416,7 @@ window.addEventListener("load", () => {
     // Draw your player
     ctx.drawImage(yourSprite, player.x, player.y, player.width, player.height);
 
-    // Draw other players if close enough
+    // Draw other players if nearby
     for (const id in allPlayers) {
       if (id === playerId) continue;
       const p = allPlayers[id];
