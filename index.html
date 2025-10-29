@@ -1479,6 +1479,85 @@ window.addEventListener("load", () => {
 </script>
 
 
+<script>
+  // 🔹 Canvas setup
+  const canvas = document.getElementById("gameCanvas");
+  const ctx = canvas.getContext("2d");
+
+  // 🔹 Player setup
+  const playerId = "player_" + Math.floor(Math.random() * 999999);
+  const roomId = "world1";
+  const playerRef = db.ref(`rooms/${roomId}/players/${playerId}`);
+  const playersRef = db.ref(`rooms/${roomId}/players`);
+  const player = { x: 100, y: 100, width: 50, height: 50 };
+
+  // 🔹 Load sprites
+  const yourSprite = new Image();
+  yourSprite.src = "sprites/yourSimitaur.png"; // replace with your sprite path
+  const otherSprite = new Image();
+  otherSprite.src = "sprites/otherSimitaur.png"; // replace with other players sprite path
+
+  // 🔹 Add player to Firebase
+  playerRef.set({ x: player.x, y: player.y, hp: 100, online: true });
+  playerRef.onDisconnect().remove();
+
+  // 🔹 Track all players
+  const allPlayers = {};
+  playersRef.on("child_added", snapshot => {
+    const id = snapshot.key;
+    allPlayers[id] = snapshot.val();
+  });
+  playersRef.on("child_changed", snapshot => {
+    const id = snapshot.key;
+    allPlayers[id] = snapshot.val();
+  });
+  playersRef.on("child_removed", snapshot => {
+    const id = snapshot.key;
+    delete allPlayers[id];
+  });
+
+  // 🔹 Update position
+  function updatePlayerPosition(x, y) {
+    playerRef.update({ x, y });
+  }
+
+  // 🔹 Movement controls
+  document.addEventListener("keydown", e => {
+    const speed = 5;
+    if (e.key === "ArrowRight") player.x += speed;
+    if (e.key === "ArrowLeft") player.x -= speed;
+    if (e.key === "ArrowUp") player.y -= speed;
+    if (e.key === "ArrowDown") player.y += speed;
+    updatePlayerPosition(player.x, player.y);
+  });
+
+  function distance(p1, p2) {
+    return Math.hypot(p1.x - p2.x, p1.y - p2.y);
+  }
+
+  const visibleDistance = 150;
+
+  // 🔹 Game loop
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw your player
+    ctx.drawImage(yourSprite, player.x, player.y, player.width, player.height);
+
+    // Draw other players
+    for (const id in allPlayers) {
+      if (id === playerId) continue;
+      const p = allPlayers[id];
+      if (distance(player, p) <= visibleDistance) {
+        ctx.drawImage(otherSprite, p.x, p.y, player.width, player.height);
+      }
+    }
+
+    requestAnimationFrame(draw);
+  }
+
+  draw();
+</script>
 
 
 
