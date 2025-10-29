@@ -1353,6 +1353,13 @@ window.addEventListener("load", () => {
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 
 <script>
+<canvas id="gameCanvas" width="800" height="600" style="border:1px solid #000;"></canvas>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+
+<script>
+  // 🔹 Firebase config
   const firebaseConfig = {
     apiKey: "AIzaSyCxyW86qYBD41T_6PdM0mMtg233sQfCbAM",
     authDomain: "simitaurs.firebaseapp.com",
@@ -1364,86 +1371,81 @@ window.addEventListener("load", () => {
     measurementId: "G-T6K30LZTLK"
   };
 
-  // Initialize Firebase
+  // 🔹 Initialize Firebase
   const app = firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
 
-  // Unique ID for this player
+  // 🔹 Canvas setup
+  const canvas = document.getElementById("gameCanvas");
+  const ctx = canvas.getContext("2d");
+
+  // 🔹 Player setup
   const playerId = "player_" + Math.floor(Math.random() * 999999);
   const roomId = "world1";
   const playerRef = db.ref(`rooms/${roomId}/players/${playerId}`);
+  
+  // Your actual player coordinates
+  const player = { x: 100, y: 100, size: 40, color: "blue" };
 
-  // Add player to Firebase
-  const startX = Math.floor(Math.random() * 500);
-  const startY = Math.floor(Math.random() * 300);
+  // 🔹 Add player to Firebase
   playerRef.set({
-    x: startX,
-    y: startY,
+    x: player.x,
+    y: player.y,
     hp: 100,
     online: true
   });
-
-  // Remove player on disconnect
   playerRef.onDisconnect().remove();
 
-  // Track all players
+  // 🔹 Track all players
   let allPlayers = {};
-  const playerElements = {}; // DOM elements for each player
 
-  // Listen for all players
-  db.ref(`rooms/${roomId}/players`).on("value", (snapshot) => {
+  db.ref(`rooms/${roomId}/players`).on("value", snapshot => {
     allPlayers = snapshot.val() || {};
-
-    // Remove disconnected players
-    for (const id in playerElements) {
-      if (!allPlayers[id]) {
-        playerElements[id].remove();
-        delete playerElements[id];
-      }
-    }
-
-    // Draw/update all players
-    for (const id in allPlayers) {
-      const p = allPlayers[id];
-
-      // Create player div if doesn't exist
-      if (!playerElements[id]) {
-        const div = document.createElement("div");
-        div.className = "player";
-        div.style.position = "absolute";
-        div.style.width = "40px";
-        div.style.height = "40px";
-        div.style.borderRadius = "50%";
-        div.style.background = id === playerId ? "blue" : "red"; // You = blue, others = red
-        div.style.textAlign = "center";
-        div.style.color = "white";
-        div.style.fontSize = "12px";
-        div.style.lineHeight = "40px";
-        div.innerText = id === playerId ? "You" : "";
-        document.body.appendChild(div);
-        playerElements[id] = div;
-      }
-
-      // Update position
-      playerElements[id].style.left = p.x + "px";
-      playerElements[id].style.top = p.y + "px";
-    }
   });
 
-  // Update your player coordinates
-  // Replace this with your actual game movement coordinates
+  // 🔹 Update player position in Firebase
   function updatePlayerPosition(x, y) {
     playerRef.update({ x, y });
   }
 
-  // Example: Move randomly every 2 seconds for testing
-  setInterval(() => {
-    const x = Math.floor(Math.random() * 500);
-    const y = Math.floor(Math.random() * 300);
-    updatePlayerPosition(x, y);
-  }, 2000);
+  // 🔹 Movement (example: arrow keys)
+  document.addEventListener("keydown", e => {
+    if (e.key === "ArrowRight") player.x += 5;
+    if (e.key === "ArrowLeft") player.x -= 5;
+    if (e.key === "ArrowUp") player.y -= 5;
+    if (e.key === "ArrowDown") player.y += 5;
 
+    updatePlayerPosition(player.x, player.y);
+  });
+
+  // 🔹 Main render loop
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw all players
+    for (const id in allPlayers) {
+      const p = allPlayers[id];
+      ctx.beginPath();
+      ctx.arc(p.x + 20, p.y + 20, 20, 0, Math.PI * 2); // 20 = radius
+      ctx.fillStyle = id === playerId ? "blue" : "red";
+      ctx.fill();
+      ctx.strokeStyle = "#000";
+      ctx.stroke();
+      ctx.closePath();
+
+      // Optional: draw player ID or "You"
+      ctx.fillStyle = "white";
+      ctx.font = "12px Arial";
+      ctx.textAlign = "center";
+      ctx.fillText(id === playerId ? "You" : "", p.x + 20, p.y + 25);
+    }
+
+    requestAnimationFrame(draw);
+  }
+
+  draw(); // start render loop
 </script>
+
 
 
   
