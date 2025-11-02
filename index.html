@@ -1419,8 +1419,36 @@ window.addEventListener("load", () => {
     appId: "1:415340567485:web:99538c93559940f7c890d4",
     measurementId: "G-T6K30LZTLK"
   };
-  firebase.initializeApp(firebaseConfig);
-  const db = firebase.database();
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// ===== MULTIPLAYER SETUP =====
+let otherPlayers = {};
+
+// Listen for all players
+db.ref("players").on("value", (snapshot) => {
+  const all = snapshot.val() || {};
+  otherPlayers = {};
+  for (const [name, data] of Object.entries(all)) {
+    if (name === player.name) continue; // skip yourself
+    otherPlayers[name] = data;
+  }
+});
+
+// Save your own position to Firebase
+function updateOnlinePosition() {
+  if (!player.name) return;
+  db.ref("players/" + player.name).set({
+    x: player.x,
+    y: player.y,
+    ts: Date.now()
+  });
+}
+
+// Remove yourself when leaving
+window.addEventListener("beforeunload", () => {
+  if (player.name) db.ref("players/" + player.name).remove();
+});
 
   // Canvas
   const canvas = document.getElementById("gameCanvas");
