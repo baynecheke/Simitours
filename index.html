@@ -217,21 +217,23 @@
 
 <!-- SimDex (modal) -->
 <div id="dex" class="panel">
-  <div class="box" style="max-width:980px; max-height:80vh; overflow-y:auto;">
-    <h2 style="margin-top:0; position:sticky; top:0; background:var(--card); padding:6px 0; z-index:5;">
-      Your SimDex
-    </h2>
+  <div class="box" style="max-width:980px; max-height:80vh; display:flex; flex-direction:column;">
+    <h2 style="margin-top:0; text-align:center;">Your SimDex</h2>
 
-    <div id="dexGrid" style="
-      display:flex;
-      flex-direction:column;
-      gap:10px;
+    <!-- Scrollable area -->
+    <div id="dexScrollArea" style="
+      flex:1;
       overflow-y:auto;
-      max-height:70vh;
-      padding-right:10px;
-    "></div>
+      border:1px solid rgba(255,255,255,0.1);
+      border-radius:8px;
+      padding:10px;
+      max-height:65vh;
+      background:rgba(0,0,0,0.2);
+    ">
+      <div id="dexGrid" style="display:flex; flex-wrap:wrap; gap:12px; justify-content:center;"></div>
+    </div>
 
-    <div style="text-align:center; margin-top:10px; position:sticky; bottom:0; background:var(--card); padding:6px 0;">
+    <div style="text-align:center; margin-top:10px;">
       <button id="btnCloseDex" class="btn">Close</button>
     </div>
   </div>
