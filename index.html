@@ -615,9 +615,29 @@
         drawRarityFX(s, sx, sy);
       }
     });
-    // player
-    const px = (player.x - camX + VIEW_W/2)*TILE, py = (player.y - camY + VIEW_W/2)*TILE;
-    if(player.img) ctx.drawImage(player.img, px, py, TILE, TILE); else { ctx.fillStyle='#1d3557'; ctx.fillRect(px, py, TILE, TILE); }
+// ===== DRAW OTHER ONLINE PLAYERS =====
+for (const [name, p] of Object.entries(otherPlayers)) {
+  const sx = p.x - camX + VIEW_W / 2;
+  const sy = p.y - camY + VIEW_H / 2;
+  if (sx >= -1 && sx < VIEW_W + 1 && sy >= -1 && sy < VIEW_H + 1) {
+    const dx = sx * TILE, dy = sy * TILE;
+    ctx.fillStyle = "#4ecdc4"; // teal color for other players
+    ctx.fillRect(dx, dy, TILE, TILE);
+
+    // name tag
+    ctx.fillStyle = "rgba(0,0,0,0.6)";
+    ctx.fillRect(dx, dy - 16, TILE, 16);
+    ctx.fillStyle = "white";
+    ctx.font = "12px monospace";
+    ctx.fillText(name, dx + 4, dy - 4);
+  }
+}
+
+// player
+const px = (player.x - camX + VIEW_W/2)*TILE, py = (player.y - camY + VIEW_W/2)*TILE;
+if(player.img) ctx.drawImage(player.img, px, py, TILE, TILE); 
+else { ctx.fillStyle='#1d3557'; ctx.fillRect(px, py, TILE, TILE); }
+
     // suit overlay (if equipped & loaded)
     if(equippedSuit !== null && suits[equippedSuit] && suits[equippedSuit].img){
       try{
