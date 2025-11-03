@@ -556,34 +556,69 @@
   // ----- Camera -----
   let camX = player.x, camY = player.y;
 
-  // ----- Drawing -----
-  let sparklePhase = 0;
-  function draw(){
-    // Smooth camera that eases toward the player but keeps them visually centered.
-    // We ease the camera toward the player's coordinates, then snap if the difference
-    // becomes negligibly small to avoid perpetual tiny offsets.
-    const ease = 0.18;                      // smoothing factor (0 = no move, 1 = instant)
+// ----- Drawing -----
+let sparklePhase = 0;
+
+function draw() {
+    // Smooth camera that eases toward the player but keeps them visually centered
+    const ease = 0.18; 
     const dx = player.x - camX;
     const dy = player.y - camY;
     camX += dx * ease;
     camY += dy * ease;
-    // Snap if extremely close to avoid tiny persistent offsets
     if (Math.abs(dx) < 0.002) camX = player.x;
     if (Math.abs(dy) < 0.002) camY = player.y;
+
     const worldLeft = Math.floor(camX - VIEW_W/2);
     const worldTop  = Math.floor(camY - VIEW_H/2);
-    ctx.clearRect(0,0,cvs.width,cvs.height);
-    // tiles
-    for(let ty=0; ty<VIEW_H; ty++){
-      for(let tx=0; tx<VIEW_W; tx++){
-        const gx = worldLeft + tx, gy = worldTop + ty;
-        ctx.fillStyle = ((gx+gy)&1) ? '#7cc57a' : '#67b86a';
-        const px = (gx - camX + VIEW_W/2) * TILE;
-        const py = (gy - camY + VIEW_H/2) * TILE;
-        ctx.fillRect(px, py, TILE, TILE);
-        // flowers removed entirely (no flora/animation)
-      }
+
+    // Clear canvas
+    ctx.clearRect(0, 0, cvs.width, cvs.height);
+
+    // Draw tiles
+    for (let ty = 0; ty < VIEW_H; ty++) {
+        for (let tx = 0; tx < VIEW_W; tx++) {
+            const gx = worldLeft + tx;
+            const gy = worldTop + ty;
+            ctx.fillStyle = ((gx + gy) & 1) ? '#7cc57a' : '#67b86a';
+            const px = (gx - camX + VIEW_W/2) * TILE;
+            const py = (gy - camY + VIEW_H/2) * TILE;
+            ctx.fillRect(px, py, TILE, TILE);
+        }
     }
+
+    // Draw local player
+    drawPlayer(player);
+
+    // Draw other players from Firebase
+    for (let id in players) {
+        const p = players[id];
+        if (p.id !== player.id) { // skip yourself
+            drawPlayer(p);
+        }
+    }
+
+    // Optional: add other effects (sparks, items, etc.)
+}
+
+// Helper function to draw any player
+function drawPlayer(p) {
+    const px = (p.x - camX + VIEW_W/2) * TILE;
+    const py = (p.y - camY + VIEW_H/2) * TILE;
+
+    if (p.img) {
+        ctx.drawImage(p.img, px, py, TILE, TILE);
+    } else {
+        ctx.fillStyle = '#1d3557';
+        ctx.fillRect(px, py, TILE, TILE);
+    }
+}
+
+// Continuous redraw loop at 60 FPS
+setInterval(() => {
+    draw();
+}, 1000 / 60);
+
     // NPC
     const nx = npc.x - camX + VIEW_W/2, ny = npc.y - camY + VIEW_W/2;
     if(nx>-1 && nx<VIEW_W+1 && ny>-1 && ny<VIEW_H+1){
