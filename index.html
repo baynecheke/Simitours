@@ -665,27 +665,86 @@
   wirePad('padUp',0,-1); wirePad('padDown',0,1); wirePad('padLeft',-1,0); wirePad('padRight',1,0);
   window.addEventListener('keydown', e=>{ const k=e.key.toLowerCase(); if(k==='arrowup'||k==='w') move(0,-1); if(k==='arrowdown'||k==='s') move(0,1); if(k==='arrowleft'||k==='a') move(-1,0); if(k==='arrowright'||k==='d') move(1,0); });
 
-  // ----- UI wiring: sign in, menu, settings, windows -----
-  function panel(id, show){ document.querySelectorAll('.panel').forEach(p=>p.classList.remove('show')); if(show) document.getElementById(id).classList.add('show'); }
-  function wire(id, fn){ const el=document.getElementById(id); el.addEventListener('click', fn); el.addEventListener('touchstart', e=>{ e.preventDefault(); fn(); }, {passive:false}); }
-  function showWin(sel){ document.querySelector(sel).classList.add('show'); }
-  function hideWin(sel){ document.querySelector(sel).classList.remove('show'); }
-  document.querySelectorAll('.closeX').forEach(btn=>btn.addEventListener('click', ()=>{ hideWin(btn.dataset.close); }));
+// ----- UI wiring: sign in, menu, settings, windows -----
+function panel(id, show){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('show'));
+  if(show) document.getElementById(id).classList.add('show');
+}
+function wire(id, fn){
+  const el=document.getElementById(id);
+  el.addEventListener('click', fn);
+  el.addEventListener('touchstart', e=>{
+    e.preventDefault();
+    fn();
+  }, {passive:false});
+}
+function showWin(sel){ document.querySelector(sel).classList.add('show'); }
+function hideWin(sel){ document.querySelector(sel).classList.remove('show'); }
+document.querySelectorAll('.closeX').forEach(btn=>btn.addEventListener('click', ()=>{ hideWin(btn.dataset.close); }));
 
-  wire('btnSignIn', ()=>{ const n=document.getElementById('playerName').value.trim(); const p=document.getElementById('playerPass').value; if(!n||!p) return alert('Enter name and password'); player.name=n; player.pass=p; if(document.getElementById('rememberMe').checked) saveGame(); document.getElementById('signin-area').style.display='none'; document.getElementById('menu-main').style.display='flex'; });
-  wire('btnGuest', ()=>{ player.name='Guest'; document.getElementById('signin-area').style.display='none'; document.getElementById('menu-main').style.display='flex'; });
-  wire('btnStart', ()=>{ mode='world'; document.getElementById('menu').style.display='none'; // Force hide menu
-  panel('menu', false); document.getElementById('hud').style.display='flex'; document.getElementById('dpad').style.display = isTouch() ? 'grid' : 'none'; draw(); drawMini(); if(musicOn) startMusic(); updateCoinsUI(); buildShop(); buildQuests(); checkBossSpawnOnLoad(); startBossCountdownTimer(); buildSuitUI(); });
-  wire('btnOpenSettings', ()=>showWin('#settingsWin'));
-  wire('btnSettings', ()=>showWin('#settingsWin'));
-  wire('btnDex', ()=>{ buildDex(); panel('dex', true); });
-  wire('btnOpenDexPanel', ()=>{ buildDex(); panel('dex', true); });
-  wire('btnCloseDex', ()=>panel('dex', false));
-  wire('btnShop', ()=>{ buildShop(); showWin('#shopWin'); });
-  wire('btnQuests', ()=>{ buildQuests(); showWin('#questWin'); });
-  wire('btnMusic', ()=>{ musicOn=!musicOn; document.getElementById('btnMusic').textContent='Music: '+(musicOn?'On':'Off'); document.getElementById('toggleMusic').checked=musicOn; if(musicOn) startMusic(); else musicToken++; });
+wire('btnSignIn', ()=>{
+  const n=document.getElementById('playerName').value.trim();
+  const p=document.getElementById('playerPass').value;
+  if(!n||!p) return alert('Enter name and password');
+  player.name=n; player.pass=p;
+  if(document.getElementById('rememberMe').checked){
+    saveGame();
+    localStorage.setItem('rememberedPlayer', JSON.stringify({name:n, pass:p}));
+  }
+  document.getElementById('signin-area').style.display='none';
+  document.getElementById('menu-main').style.display='flex';
+});
 
-  wire('btnSignOut', ()=>{ localStorage.removeItem(SAVE_KEY); localStorage.removeItem('simitaur_boss_next'); location.reload(); });
+wire('btnGuest', ()=>{
+  player.name='Guest';
+  document.getElementById('signin-area').style.display='none';
+  document.getElementById('menu-main').style.display='flex';
+});
+
+wire('btnStart', ()=>{
+  mode='world';
+  document.getElementById('menu').style.display='none'; // Force hide menu
+  panel('menu', false);
+  document.getElementById('hud').style.display='flex';
+  document.getElementById('dpad').style.display = isTouch() ? 'grid' : 'none';
+  draw(); drawMini();
+  if(musicOn) startMusic();
+  updateCoinsUI(); buildShop(); buildQuests(); checkBossSpawnOnLoad(); startBossCountdownTimer(); buildSuitUI();
+});
+
+wire('btnOpenSettings', ()=>showWin('#settingsWin'));
+wire('btnSettings', ()=>showWin('#settingsWin'));
+wire('btnDex', ()=>{ buildDex(); panel('dex', true); });
+wire('btnOpenDexPanel', ()=>{ buildDex(); panel('dex', true); });
+wire('btnCloseDex', ()=>panel('dex', false));
+wire('btnShop', ()=>{ buildShop(); showWin('#shopWin'); });
+wire('btnQuests', ()=>{ buildQuests(); showWin('#questWin'); });
+wire('btnMusic', ()=>{
+  musicOn=!musicOn;
+  document.getElementById('btnMusic').textContent='Music: '+(musicOn?'On':'Off');
+  document.getElementById('toggleMusic').checked=musicOn;
+  if(musicOn) startMusic(); else musicToken++;
+});
+
+// ✅ Fixed Sign Out button — clears remember-me and resets UI
+wire('btnSignOut', ()=>{
+  localStorage.removeItem(SAVE_KEY);
+  localStorage.removeItem('simitaur_boss_next');
+  localStorage.removeItem('rememberedPlayer');
+  sessionStorage.clear();
+
+  // Reset all UI and state
+  document.getElementById('playerName').value = '';
+  document.getElementById('playerPass').value = '';
+  document.getElementById('rememberMe').checked = false;
+  document.getElementById('signin-area').style.display = 'block';
+  document.getElementById('menu-main').style.display = 'none';
+  document.getElementById('hud').style.display = 'none';
+  document.getElementById('dpad').style.display = 'none';
+  mode = 'menu';
+  alert('You have been signed out and Remember Me has been cleared.');
+});
+
 
   // ----- Uploads & URL loaders -----
   function loadImgFromInput(el, cb){ const f=el.files?.[0]; if(!f) return; const url=URL.createObjectURL(f); const img=new Image(); img.crossOrigin='anonymous'; img.onload=()=>{ cb(img,url); draw(); drawMini(); }; img.src=url; }
