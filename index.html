@@ -1480,6 +1480,84 @@ window.addEventListener("load", () => {
   };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
+/* ==========================================================
+   PLAYER PROFILE + XP / LEVEL SYSTEM (Firebase Realtime DB)
+   ========================================================== */
+
+player.xp = 0;
+player.level = 1;
+player.coins = 0;
+player.sapphires = 0;
+player.inventory = {};
+
+// Load profile from Firebase
+function loadProfileData() {
+  if (!player.name) return;
+
+  db.ref("profiles/" + player.name).once("value").then(snap => {
+    const data = snap.val();
+
+    if (data) {
+      player.xp = data.xp || 0;
+      player.level = data.level || 1;
+      player.coins = data.coins || 0;
+      player.sapphires = data.sapphires || 0;
+      player.inventory = data.inventory || {};
+    } else {
+      saveProfileData();
+    }
+
+    updateXPBar();
+  });
+}
+
+// Save profile to Firebase
+function saveProfileData() {
+  if (!player.name) return;
+
+  db.ref("profiles/" + player.name).set({
+    xp: player.xp,
+    level: player.level,
+    coins: player.coins,
+    sapphires: player.sapphires,
+    inventory: player.inventory
+  });
+}
+
+// XP needed per level
+function xpNeeded(level) {
+  return 100 + (level - 1) * 50;
+}
+
+// Add XP + check for level up
+function gainXP(amount) {
+  player.xp += amount;
+
+  const needed = xpNeeded(player.level);
+
+  if (player.xp >= needed) {
+    player.xp -= needed;
+    player.level++;
+    alert(`⭐ LEVEL UP! You are now Level ${player.level}`);
+  }
+
+  updateXPBar();
+  saveProfileData();
+}
+
+// Update XP bar UI
+function updateXPBar() {
+  const bar = document.getElementById("xpBar");
+  const txt = document.getElementById("xpText");
+
+  if (!bar || !txt) return;
+
+  const needed = xpNeeded(player.level);
+  const pct = Math.floor((player.xp / needed) * 100);
+
+  bar.style.width = pct + "%";
+  txt.textContent = `Level ${player.level} — ${player.xp}/${needed} XP`;
+}
 
 // ===== MULTIPLAYER SETUP =====
 let otherPlayers = {};
