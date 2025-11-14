@@ -1464,6 +1464,20 @@ window.addEventListener("load", () => {
   }, 7000);
 });
 </script>
+  <!-- XP BAR UI -->
+<div style="width:260px; background:#1a1f25; border-radius:10px; padding:6px; margin-top:10px;">
+  <div id="xpText" style="font-size:12px; margin-bottom:4px; color:#c9a34a;">
+    Level 1 — 0/100 XP
+  </div>
+
+  <div style="width:100%; height:12px; background:#000; border-radius:6px; overflow:hidden;">
+    <div id="xpBar" style="height:100%; width:0%; background:#4caf50;"></div>
+  </div>
+</div>
+
+<!-- Your game canvas -->
+<canvas id="gameCanvas" width="800" height="600"></canvas>
+
 <canvas id="gameCanvas" width="800" height="600" style="border:1px solid #000;"></canvas>
 
 <script>
