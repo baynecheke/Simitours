@@ -1558,6 +1558,24 @@ function updateXPBar() {
   bar.style.width = pct + "%";
   txt.textContent = `Level ${player.level} — ${player.xp}/${needed} XP`;
 }
+/* ==========================================================
+   XP REWARD SHORTCUTS
+   ========================================================== */
+
+// Call this when a boss is defeated
+function onBossDefeated() { 
+  gainXP(100); 
+}
+
+// Call this when a Simitaur is caught
+function onCatchSimitaur() { 
+  gainXP(25); 
+}
+
+// Call this when a quest is completed
+function completeQuest(id) { 
+  gainXP(40); 
+}
 
 // ===== MULTIPLAYER SETUP =====
 let otherPlayers = {};
