@@ -1736,15 +1736,22 @@ color:#fff;font-weight:700;cursor:pointer}
   const items=[
     {id:"heal_small",name:"Small Heal",desc:"Restores 25 HP",coins:25,img:"images/items/heal.png"},
     {id:"xp_boost",name:"XP Boost (1 hr)",desc:"+25% XP",gems:50,img:"images/items/boost.png"},
-    {id:"gold_suit",name:"Golden Suit",desc:"Legendary cosmetic",gems:300,img:"images/items/gold.png"}
+    {id:"gold_suit",name:"Golden Suit",desc:"Legendary cosmetic",gems:300,img:"images/items/gold.png"},
+
+    // ⭐ NEW ITEM — UPGRADE SHARD
+    {id:"upgrade_shard",name:"Upgrade Shard",desc:"Use on any Simitaur: +5 ATK +5 HP",coins:150,img:"images/items/shard.png"}
   ];
+
   const grid=document.getElementById("shopGrid");
   const shop=document.getElementById("shopFull");
   const coinEl=document.getElementById("coinCount");
   const gemEl=document.getElementById("gemCount");
+
   let coins=Number(localStorage.getItem("coins")||100);
   let gems=Number(localStorage.getItem("gems")||20);
-  coinEl.textContent=coins;gemEl.textContent=gems;
+
+  coinEl.textContent=coins;
+  gemEl.textContent=gems;
 
   function render(){
     grid.innerHTML="";
@@ -1761,24 +1768,59 @@ color:#fff;font-weight:700;cursor:pointer}
     });
   }
 
-  function buy(it){
-    if(it.coins && coins>=it.coins){coins-=it.coins;save();}
-    else if(it.gems && gems>=it.gems){gems-=it.gems;save();}
-    else return alert("Not enough currency!");
-    alert("Bought "+it.name+"!");
+  // ⭐ UPGRADE SHARD LOGIC ⭐
+  function useUpgradeShard() {
+    if (!player.sims.length) return alert("You have no Simitaurs!");
+
+    openChooseSim(sim => {
+      if (!sim) return;
+
+      sim.maxHp += 5;
+      sim.hp += 5;
+
+      sim.attacks = sim.attacks.map(a => ({
+        name: a.name,
+        dmg: a.dmg + 5
+      }));
+
+      alert(sim.type.name + " upgraded! +5 ATK +5 HP");
+
+      maybeSave();
+      buildShop();
+      buildDex();
+    });
   }
 
-  function save(){localStorage.setItem("coins",coins);localStorage.setItem("gems",gems);
-    coinEl.textContent=coins;gemEl.textContent=gems;}
+  function buy(it){
+    if(it.coins && coins>=it.coins){
+      coins-=it.coins;
+      save();
+    }
+    else if(it.gems && gems>=it.gems){
+      gems-=it.gems;
+      save();
+    }
+    else return alert("Not enough currency!");
+
+    alert("Bought "+it.name+"!");
+
+    if(it.id === "upgrade_shard"){
+      useUpgradeShard();
+    }
+  }
+
+  function save(){
+    localStorage.setItem("coins",coins);
+    localStorage.setItem("gems",gems);
+    coinEl.textContent=coins;
+    gemEl.textContent=gems;
+  }
 
   window.openShopFull=()=>{render();shop.classList.add("show");};
   window.closeShopFull=()=>shop.classList.remove("show");
 
-  // attach to any existing shop button
   const btn=document.getElementById("btnShop");
   if(btn) btn.onclick=()=>openShopFull();
 })();
-</script>
-<!-- === END FULL-SCREEN MODERN SHOP === -->
 
 
