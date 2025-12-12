@@ -1,7 +1,39 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8"/>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<div id="g_id_onload"
+     data-client_id="691247578632-ioig368ultf6ovhgl089jpm6cni6s2rr.apps.googleusercontent.com"
+     data-context="signin"
+     data-callback="handleGoogleLogin">
+</div>
+
+<div class="g_id_signin"
+     data-type="standard"
+     data-size="large"
+     data-theme="outline">
+</div>
+<script>
+function handleGoogleLogin(response) {
+    const credential = response.credential;
+
+    // Decode the JWT
+    const payload = JSON.parse(atob(credential.split('.')[1]));
+
+    // Example user data you will get
+    console.log("Logged in as:", payload.name);
+    console.log("Email:", payload.email);
+    console.log("Picture:", payload.picture);
+    console.log("User ID:", payload.sub);
+
+    // Save the login to localStorage so your game knows the user is logged in
+    localStorage.setItem("googleUser", JSON.stringify(payload));
+
+    alert("Logged in as: " + payload.name);
+}
+</script>
+
+  <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
 <title>Simitaur RPG — Adventure — Quests • Coins • Shop • Mini-Map</title>
 <style>
