@@ -505,11 +505,15 @@ try {
     (function loop(){
       if(!musicOn || token !== musicToken) return;
       const t0 = audio.currentTime + 0.02;
+      scheduleBass([98,98,110,123,98,110,130,147][step%8], t0, spb);
       const chord = [[key[0],key[2],key[4]],[key[1],key[3],key[5]],[key[2],key[4],key[6]],[key[3],key[5],key[7]]][(Math.floor(step/2))%4];
-      if(step%2===0){ const o=audio.createOscillator(), g=audio.createGain(); o.type='triangle'; o.frequency.value=chord[0]/2; g.gain.value=0.05; o.connect(g); g.connect(audio.destination); o.start(t0); o.stop(t0+0.3); }
+      scheduleArp(chord, t0, spb); schedulePerc(t0+spb*0.5);
       step++; setTimeout(loop, spb*1000*2);
     })();
   }
+  function scheduleBass(freq,t0,spb){ const o=audio.createOscillator(), g=audio.createGain(); o.type='square'; o.frequency.value=freq; g.gain.value=0.06; o.connect(g); g.connect(audio.destination); const a=0.005; g.gain.setValueAtTime(0,t0); g.gain.linearRampToValueAtTime(0.08,t0+a); g.gain.linearRampToValueAtTime(0.03,t0+0.08); g.gain.linearRampToValueAtTime(0.0001,t0+spb*2-0.06); o.start(t0); o.stop(t0+spb*2); }
+  function scheduleArp(notes,t0,spb){ [0, spb*0.5, spb*1.0, spb*1.5].forEach((off,i)=>{ const o=audio.createOscillator(), g=audio.createGain(); o.type='triangle'; o.frequency.value = notes[i%notes.length]; g.gain.value=0.05; o.connect(g); g.connect(audio.destination); g.gain.setValueAtTime(0,t0+off); g.gain.linearRampToValueAtTime(0.06,t0+off+0.005); g.gain.linearRampToValueAtTime(0.0001,t0+off+spb*0.45-0.03); o.start(t0+off); o.stop(t0+off+spb*0.5); }); }
+  function schedulePerc(t){ const n=audio.createBufferSource(); const len=2200; const buf=audio.createBuffer(1,len,audio.sampleRate); const d=buf.getChannelData(0); for(let i=0;i<len;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/len,2); n.buffer=buf; const g=audio.createGain(); g.gain.value=0.06; n.connect(g); g.connect(audio.destination); n.start(t); }
 
   // ----- Save / Load / Firebase Sync -----
   const SAVE_KEY = 'simitaur_save_v6';
@@ -757,7 +761,7 @@ try {
     document.getElementById('dpad').style.display = /Mobi/i.test(navigator.userAgent) ? 'grid' : 'none';
     draw(); drawMini();
     startMusic();
-    updateCoinsUI(); buildShop(); buildQuests(); buildSuitUI();
+    updateCoinsUI(); buildShop(); buildQuests(); buildSuitUI(); updateXPUI();
   });
   
   document.getElementById('btnOpenSettings').onclick = ()=>showWin('#settingsWin');
@@ -792,6 +796,19 @@ try {
       buildSuitUI(); saveGame();
   };
   
+  // ----- Quests (RESTORED) -----
+  function buildQuests(){
+    const ql=document.getElementById('questList'); ql.innerHTML='';
+    quests.forEach(q=>{
+      const row=document.createElement('div'); row.className='healRow';
+      const left=document.createElement('div'); left.innerHTML=`<b>${q.name}</b><br><span class="note">${q.progress}/${q.goal} • Reward: ${q.reward} coins</span>`;
+      const bar=document.createElement('div'); bar.className='bar'; const i=document.createElement('i'); i.style.width=(q.progress/q.goal*100)+'%'; bar.appendChild(i);
+      const status=document.createElement('div'); status.textContent=q.done?'Done':'Active';
+      row.appendChild(left); row.appendChild(bar); row.appendChild(status);
+      ql.appendChild(row);
+    });
+  }
+
   // ----- SimDex -----
   function buildDex(){
     const grid=document.getElementById('dexGrid'); grid.innerHTML='';
@@ -839,6 +856,9 @@ try {
           player.sims.push(s);
           sims = sims.filter(x=>x!==s);
           gainXP(25);
+          // Quest Progress
+          quests.find(q=>q.id==='q1').progress++;
+          if(s.rarity==='Exotic') quests.find(q=>q.id==='q2').progress++;
       } else { alert("Escaped!"); }
       panel('encounterPanel', false);
       currentEncounter=null;
@@ -868,7 +888,7 @@ try {
       const l = document.getElementById('healList'); l.innerHTML='';
       player.sims.forEach(s=>{
           const r = document.createElement('div'); r.className='healRow';
-          r.innerHTML = `<b>${s.type.name}</b> HP:${s.hp}/${s.maxHp} <button class="btn" onclick="healSim(this)">Heal (10)</button>`;
+          r.innerHTML = `<b>${s.type.name}</b> HP:${s.hp}/${s.maxHp} <button class="btn">Heal (10)</button>`;
           r.querySelector('button').onclick = ()=>{
               if(coins>=10){ coins-=10; s.hp=s.maxHp; updateCoinsUI(); buildShop(); sfx.heal(); saveGame(); }
           };
